@@ -31,11 +31,41 @@ jobs:
             fi
           fi
 
-      - name: Prepare debug keystore and env
+      - name: Prepare Firebase config, debug keystore, and env
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
         run: |
-          if [ ! -f debug.keystore ] && [ -f debug.keystore.base64 ]; then
-            base64 -d debug.keystore.base64 > debug.keystore
+          if [ ! -f app/google-services.json ] && [ -f google-services.json ]; then
+            cp google-services.json app/google-services.json
           fi
+          if [ ! -f app/google-services.json ] && [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s\n' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          fi
+          if [ ! -f app/google-services.json ]; then
+            echo "::error::Missing app/google-services.json! Make your repo Private and upload app/google-services.json from your AI Studio ZIP, or add it as a GitHub Actions Secret named GOOGLE_SERVICES_JSON."
+            exit 1
+          fi
+
+          if [ ! -f debug.keystore ]; then
+            if [ -n "$DEBUG_KEYSTORE_BASE64" ]; then
+              printf '%s' "$DEBUG_KEYSTORE_BASE64" | tr -d '\n\r ' | base64 -d > debug.keystore
+            elif [ -f debug.keystore.base64 ]; then
+              tr -d '\n\r ' < debug.keystore.base64 | base64 -d > debug.keystore
+            else
+              echo "::warning::debug.keystore.base64 not found; generating a fresh debug.keystore. Google Sign-In/Drive will only work if its SHA-1 is added to Firebase or you provide debug.keystore.base64."
+              keytool -genkeypair -v \
+                -keystore debug.keystore \
+                -storepass android \
+                -alias androiddebugkey \
+                -keypass android \
+                -keyalg RSA \
+                -keysize 2048 \
+                -validity 10000 \
+                -dname "CN=Android Debug,O=Android,C=US"
+            fi
+          fi
+
           if [ ! -f .env ] && [ -f .env.example ]; then
             cp .env.example .env
           fi
