@@ -63,6 +63,17 @@ jobs:
                 -keysize 2048 \
                 -validity 10000 \
                 -dname "CN=Android Debug,O=Android,C=US"
+              base64 -w 0 debug.keystore > generated-debug-keystore.base64.txt
+              SHA1_VAL=$(keytool -list -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android | grep -m1 -E 'SHA-?1:' | awk '{print $2}')
+              SHA256_VAL=$(keytool -list -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android | grep -m1 -E 'SHA-?256:' | awk '{print $2}')
+              echo "::notice::Generated Keystore SHA-1: $SHA1_VAL | SHA-256: $SHA256_VAL"
+              {
+                echo "### Generated Debug Keystore Fingerprints"
+                echo "- **SHA-1:** \`$SHA1_VAL\`"
+                echo "- **SHA-256:** \`$SHA256_VAL\`"
+                echo ""
+                echo "Add this SHA-1 in Firebase Console -> Project Settings -> Android app -> Add fingerprint, and save \`generated-debug-keystore.base64.txt\` as the \`DEBUG_KEYSTORE_BASE64\` GitHub Secret."
+              } >> "$GITHUB_STEP_SUMMARY"
             fi
           fi
 
@@ -83,4 +94,12 @@ jobs:
         with:
           name: Hisab-app-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+
+      - name: Upload generated keystore base64 (if created)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Hisab-debug-keystore-base64
+          path: generated-debug-keystore.base64.txt
+          if-no-files-found: ignore
           retention-days: 30
