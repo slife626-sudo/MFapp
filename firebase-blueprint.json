@@ -1,0 +1,167 @@
+{
+  "entities": {
+    "Expense": {
+      "title": "Expense",
+      "description": "A daily expense record owned by a user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner."
+        },
+        "title": {
+          "type": "string",
+          "description": "Short expense title (1-120 chars)."
+        },
+        "amount": {
+          "type": "number",
+          "description": "Positive expense amount."
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Identifier of the expense category."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["CASH", "CARD", "MOBILE", "BANK"],
+          "description": "Payment channel used."
+        },
+        "note": {
+          "type": "string",
+          "description": "Optional expense note (0-300 chars)."
+        },
+        "dateMillis": {
+          "type": "integer",
+          "description": "Expense date/time in epoch milliseconds."
+        },
+        "monthKey": {
+          "type": "string",
+          "description": "Year-month bucket formatted as YYYY-MM."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) on creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) on update."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "amount",
+        "categoryId",
+        "paymentMethod",
+        "note",
+        "dateMillis",
+        "monthKey",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "CustomCategory": {
+      "title": "CustomCategory",
+      "description": "A user-defined expense category.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner."
+        },
+        "name": {
+          "type": "string",
+          "description": "Category display name (1-40 chars)."
+        },
+        "iconKey": {
+          "type": "string",
+          "description": "Icon identifier key."
+        },
+        "colorHex": {
+          "type": "integer",
+          "description": "ARGB color integer."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "name",
+        "iconKey",
+        "colorHex",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MonthlyBudget": {
+      "title": "MonthlyBudget",
+      "description": "Monthly overall and per-category budget limits.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner."
+        },
+        "monthKey": {
+          "type": "string",
+          "description": "Budget period key (YYYY-MM or default)."
+        },
+        "totalLimit": {
+          "type": "number",
+          "description": "Monthly overall budget limit."
+        },
+        "categoryLimits": {
+          "type": "object",
+          "description": "Map of categoryId to numeric spending limit."
+        },
+        "currencyCode": {
+          "type": "string",
+          "description": "ISO currency code such as BDT, USD, INR, EUR, GBP."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp())."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp())."
+        }
+      },
+      "required": [
+        "userId",
+        "monthKey",
+        "totalLimit",
+        "categoryLimits",
+        "currencyCode",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/expenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/Expense" },
+      "description": "User-scoped daily expense entries."
+    },
+    "/users/{userId}/categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/CustomCategory" },
+      "description": "User-scoped custom expense categories."
+    },
+    "/users/{userId}/budgets/{budgetId}": {
+      "schema": { "$ref": "#/entities/MonthlyBudget" },
+      "description": "User-scoped monthly and default budget limits."
+    }
+  }
+}

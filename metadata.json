@@ -1,0 +1,6 @@
+{
+  "name": "Hisab",
+  "description": "Ad-free daily expense tracker with categories, monthly reports, charts, PIN lock, budgets, reminders, dark mode, custom themes, multi-language support, offline cache, Firestore cloud sync, and Google Drive backup.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
