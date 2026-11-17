@@ -90,6 +90,28 @@ service cloud.firestore {
              data.updatedAt <= request.time;
     }
 
+    function isValidIncome(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.title is string &&
+             data.title.size() >= 1 &&
+             data.title.size() <= 120 &&
+             data.amount is number &&
+             data.amount > 0 &&
+             data.amount <= 1000000000 &&
+             data.paymentMethod in ['CASH', 'CARD', 'MOBILE', 'BANK'] &&
+             data.note is string &&
+             data.note.size() <= 300 &&
+             data.dateMillis is int &&
+             data.dateMillis > 0 &&
+             isValidMonthKey(data.monthKey) &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
     match /users/{userId}/expenses/{expenseId} {
       allow list: if isOwner(userId);
       allow get: if isOwner(userId) && isValidId(expenseId);
@@ -108,6 +130,26 @@ service cloud.firestore {
                        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'amount', 'categoryId', 'paymentMethod', 'note', 'dateMillis', 'monthKey', 'updatedAt']);
 
       allow delete: if isOwner(userId) && isValidId(expenseId);
+    }
+
+    match /users/{userId}/incomes/{incomeId} {
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(incomeId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(incomeId) &&
+                       incoming().keys().hasAll(['userId', 'title', 'amount', 'paymentMethod', 'note', 'dateMillis', 'monthKey', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'title', 'amount', 'paymentMethod', 'note', 'dateMillis', 'monthKey', 'createdAt', 'updatedAt']) &&
+                       isValidIncome(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(incomeId) &&
+                       isValidIncome(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['title', 'amount', 'paymentMethod', 'note', 'dateMillis', 'monthKey', 'updatedAt']);
+
+      allow delete: if isOwner(userId) && isValidId(incomeId);
     }
 
     match /users/{userId}/categories/{categoryId} {

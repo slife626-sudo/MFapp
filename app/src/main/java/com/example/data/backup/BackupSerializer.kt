@@ -4,6 +4,7 @@ import com.example.data.model.CategoryItem
 import com.example.data.model.CustomCategory
 import com.example.data.model.DateFormatUtils
 import com.example.data.model.Expense
+import com.example.data.model.Income
 import com.example.data.model.MonthlyBudget
 import com.example.data.model.PaymentMethod
 import com.example.i18n.AppStrings
@@ -14,6 +15,7 @@ data class BackupPayload(
   val expenses: List<Expense>,
   val customCategories: List<CustomCategory>,
   val budgets: List<MonthlyBudget>,
+  val incomes: List<Income> = emptyList(),
 )
 
 object BackupSerializer {
@@ -22,10 +24,11 @@ object BackupSerializer {
     expenses: List<Expense>,
     customCategories: List<CustomCategory>,
     budgets: List<MonthlyBudget>,
+    incomes: List<Income> = emptyList(),
   ): String {
     val root = JSONObject().apply {
       put("app", "Hisab")
-      put("version", 1)
+      put("version", 2)
       put("exportedAtMillis", System.currentTimeMillis())
 
       val expArr = JSONArray()
@@ -44,6 +47,22 @@ object BackupSerializer {
         )
       }
       put("expenses", expArr)
+
+      val incArr = JSONArray()
+      for (inc in incomes) {
+        incArr.put(
+          JSONObject().apply {
+            put("id", inc.id)
+            put("title", inc.title)
+            put("amount", inc.amount)
+            put("paymentMethod", inc.paymentMethod)
+            put("note", inc.note)
+            put("dateMillis", inc.dateMillis)
+            put("monthKey", inc.monthKey)
+          }
+        )
+      }
+      put("incomes", incArr)
 
       val catArr = JSONArray()
       for (c in customCategories) {
@@ -106,6 +125,31 @@ object BackupSerializer {
       }
     }
 
+    val incArr = root.optJSONArray("incomes") ?: JSONArray()
+    val incomes = buildList {
+      for (i in 0 until incArr.length()) {
+        val obj = incArr.optJSONObject(i) ?: continue
+        val title = obj.optString("title", "").trim()
+        val amount = obj.optDouble("amount", 0.0)
+        if (title.isEmpty() || amount <= 0.0 || amount.isNaN()) continue
+        val dateMillis = obj.optLong("dateMillis", System.currentTimeMillis())
+        val monthKey = obj.optString("monthKey", "").ifBlank {
+          DateFormatUtils.monthKeyFromMillis(dateMillis)
+        }
+        add(
+          Income(
+            id = obj.optString("id", ""),
+            title = title,
+            amount = amount,
+            paymentMethod = PaymentMethod.fromWire(obj.optString("paymentMethod")).wireValue,
+            note = obj.optString("note", ""),
+            dateMillis = dateMillis,
+            monthKey = monthKey,
+          )
+        )
+      }
+    }
+
     val catArr = root.optJSONArray("categories") ?: JSONArray()
     val categories = buildList {
       for (i in 0 until catArr.length()) {
@@ -153,6 +197,7 @@ object BackupSerializer {
       expenses = expenses,
       customCategories = categories,
       budgets = budgets,
+      incomes = incomes,
     )
   }
 
@@ -162,27 +207,55 @@ object BackupSerializer {
     currencySymbol: String,
     strings: AppStrings,
     langCode: String,
+    incomes: List<Income> = emptyList(),
   ): String {
     val sb = StringBuilder()
     // UTF-8 BOM so Bengali & Hindi text opens cleanly in Microsoft Excel
     sb.append('\uFEFF')
-    sb.append("${strings.dateLabel},${strings.expenseTitleLabel},${strings.categoryLabel},${strings.paymentMethodLabel},${strings.amountLabel},Currency,${strings.noteOptionalLabel}\n")
-    for (exp in expenses.sortedByDescending { it.dateMillis }) {
-      val dateStr = DateFormatUtils.formatDateCompact(exp.dateMillis, langCode)
-      val catName = categoriesById[exp.categoryId]?.name ?: exp.categoryId
-      val methodLabel = when (PaymentMethod.fromWire(exp.paymentMethod)) {
-        PaymentMethod.CASH -> strings.cash
-        PaymentMethod.CARD -> strings.card
-        PaymentMethod.MOBILE -> strings.mobileBanking
-        PaymentMethod.BANK -> strings.bank
+    sb.append("Type,${strings.dateLabel},${strings.expenseTitleLabel},${strings.categoryLabel},${strings.paymentMethodLabel},${strings.amountLabel},Currency,${strings.noteOptionalLabel}\n")
+
+    data class CsvRow(
+      val dateMillis: Long,
+      val typeLabel: String,
+      val title: String,
+      val category: String,
+      val method: String,
+      val signedAmount: String,
+      val note: String,
+    )
+
+    val rows = buildList {
+      for (exp in expenses) {
+        val catName = categoriesById[exp.categoryId]?.name ?: exp.categoryId
+        val methodLabel = when (PaymentMethod.fromWire(exp.paymentMethod)) {
+          PaymentMethod.CASH -> strings.cash
+          PaymentMethod.CARD -> strings.card
+          PaymentMethod.MOBILE -> strings.mobileBanking
+          PaymentMethod.BANK -> strings.bank
+        }
+        add(CsvRow(exp.dateMillis, strings.entryTypeExpense, exp.title, catName, methodLabel, "-${exp.amount}", exp.note))
       }
+      for (inc in incomes) {
+        val methodLabel = when (PaymentMethod.fromWire(inc.paymentMethod)) {
+          PaymentMethod.CASH -> strings.cash
+          PaymentMethod.CARD -> strings.card
+          PaymentMethod.MOBILE -> strings.mobileBanking
+          PaymentMethod.BANK -> strings.bank
+        }
+        add(CsvRow(inc.dateMillis, strings.entryTypeIncome, inc.title, strings.entryTypeIncome, methodLabel, "+${inc.amount}", inc.note))
+      }
+    }.sortedByDescending { it.dateMillis }
+
+    for (row in rows) {
+      val dateStr = DateFormatUtils.formatDateCompact(row.dateMillis, langCode)
+      sb.append(csvEscape(row.typeLabel)).append(',')
       sb.append(csvEscape(dateStr)).append(',')
-      sb.append(csvEscape(exp.title)).append(',')
-      sb.append(csvEscape(catName)).append(',')
-      sb.append(csvEscape(methodLabel)).append(',')
-      sb.append(exp.amount).append(',')
+      sb.append(csvEscape(row.title)).append(',')
+      sb.append(csvEscape(row.category)).append(',')
+      sb.append(csvEscape(row.method)).append(',')
+      sb.append(row.signedAmount).append(',')
       sb.append(csvEscape(currencySymbol)).append(',')
-      sb.append(csvEscape(exp.note)).append('\n')
+      sb.append(csvEscape(row.note)).append('\n')
     }
     return sb.toString()
   }

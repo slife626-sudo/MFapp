@@ -255,3 +255,63 @@ test("Owner can create and update custom categories and monthly budgets", async 
     })
   );
 });
+
+test("Owner can create, update, and delete wallet balance/income entries; cross-user and invalid writes denied", async () => {
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+  const unauthDb = testEnv.unauthenticatedContext().firestore();
+  const created = new Date(Date.now() - 10000);
+
+  await assertFails(unauthDb.collection("users").doc(ALICE_UID).collection("incomes").get());
+
+  const incRef = aliceDb.collection("users").doc(ALICE_UID).collection("incomes").doc("inc_1");
+  await assertSucceeds(
+    incRef.set({
+      userId: ALICE_UID,
+      title: "Monthly Salary",
+      amount: 1000,
+      paymentMethod: "CASH",
+      note: "Opening balance",
+      dateMillis: Date.now() - 5000,
+      monthKey: "2026-11",
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+
+  await assertSucceeds(aliceDb.collection("users").doc(ALICE_UID).collection("incomes").get());
+
+  await assertSucceeds(
+    incRef.update({
+      title: "Opening Wallet Balance",
+      amount: 1500,
+      paymentMethod: "MOBILE",
+      note: "Topped up",
+      dateMillis: Date.now() - 4000,
+      monthKey: "2026-11",
+      updatedAt: new Date(Date.now() - 1000),
+    })
+  );
+
+  // Reject negative amount
+  await assertFails(
+    aliceDb.collection("users").doc(ALICE_UID).collection("incomes").doc("inc_bad").set({
+      userId: ALICE_UID,
+      title: "Invalid",
+      amount: 0,
+      paymentMethod: "CASH",
+      note: "",
+      dateMillis: Date.now(),
+      monthKey: "2026-11",
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+
+  // Cross-user isolation
+  await assertFails(bobDb.collection("users").doc(ALICE_UID).collection("incomes").get());
+  await assertFails(bobDb.collection("users").doc(ALICE_UID).collection("incomes").doc("inc_1").delete());
+
+  // Owner delete succeeds
+  await assertSucceeds(incRef.delete());
+});

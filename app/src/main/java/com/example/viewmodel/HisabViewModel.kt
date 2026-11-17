@@ -18,6 +18,7 @@ import com.example.data.model.CurrencyOption
 import com.example.data.model.CustomCategory
 import com.example.data.model.DateFormatUtils
 import com.example.data.model.Expense
+import com.example.data.model.Income
 import com.example.data.model.MonthlyBudget
 import com.example.data.model.PaymentMethod
 import com.example.data.model.UiState
@@ -59,6 +60,8 @@ data class CategoryBreakdown(
 data class MonthlySummary(
   val monthKey: String,
   val totalSpent: Double,
+  val totalIncome: Double,
+  val netBalance: Double,
   val prevMonthSpent: Double,
   val transactionCount: Int,
   val dailyAverage: Double,
@@ -71,6 +74,7 @@ data class MonthlySummary(
 
 data class DashboardUiData(
   val expenses: List<Expense>,
+  val incomes: List<Income>,
   val customCategories: List<CustomCategory>,
   val budgets: List<MonthlyBudget>,
   val hasPendingWrites: Boolean,
@@ -115,16 +119,18 @@ class HisabViewModel(
 
   val dashboardState: StateFlow<UiState<DashboardUiData>> = combine(
     repository.observeExpenses(currentUserId),
+    repository.observeIncomes(currentUserId),
     repository.observeCustomCategories(currentUserId),
     repository.observeBudgets(currentUserId),
-  ) { expSnap: SyncSnapshot<Expense>, cats: List<CustomCategory>, budgets: List<MonthlyBudget> ->
+  ) { expSnap: SyncSnapshot<Expense>, incSnap: SyncSnapshot<Income>, cats: List<CustomCategory>, budgets: List<MonthlyBudget> ->
     UiState.Success(
       DashboardUiData(
         expenses = expSnap.items,
+        incomes = incSnap.items,
         customCategories = cats,
         budgets = budgets,
-        hasPendingWrites = expSnap.hasPendingWrites,
-        isFromCache = expSnap.isFromCache,
+        hasPendingWrites = expSnap.hasPendingWrites || incSnap.hasPendingWrites,
+        isFromCache = expSnap.isFromCache && incSnap.isFromCache,
       )
     ) as UiState<DashboardUiData>
   }
@@ -320,6 +326,61 @@ class HisabViewModel(
     }
   }
 
+  fun addIncome(
+    title: String,
+    amount: Double,
+    paymentMethod: PaymentMethod,
+    note: String,
+    dateMillis: Long,
+  ) {
+    viewModelScope.launch {
+      val result = repository.addIncome(
+        userId = currentUserId,
+        title = title,
+        amount = amount,
+        paymentMethod = paymentMethod,
+        note = note,
+        dateMillis = dateMillis,
+      )
+      result.onFailure { err ->
+        _messages.tryEmit(err.localizedMessage ?: "Failed to save balance")
+      }
+    }
+  }
+
+  fun updateIncome(
+    incomeId: String,
+    title: String,
+    amount: Double,
+    paymentMethod: PaymentMethod,
+    note: String,
+    dateMillis: Long,
+  ) {
+    viewModelScope.launch {
+      val result = repository.updateIncome(
+        userId = currentUserId,
+        incomeId = incomeId,
+        title = title,
+        amount = amount,
+        paymentMethod = paymentMethod,
+        note = note,
+        dateMillis = dateMillis,
+      )
+      result.onFailure { err ->
+        _messages.tryEmit(err.localizedMessage ?: "Failed to update balance")
+      }
+    }
+  }
+
+  fun deleteIncome(incomeId: String) {
+    viewModelScope.launch {
+      val result = repository.deleteIncome(currentUserId, incomeId)
+      result.onFailure { err ->
+        _messages.tryEmit(err.localizedMessage ?: "Failed to delete balance")
+      }
+    }
+  }
+
   fun addCustomCategory(name: String, iconKey: String, colorHex: Long) {
     viewModelScope.launch {
       repository.addCustomCategory(currentUserId, name, iconKey, colorHex)
@@ -364,6 +425,7 @@ class HisabViewModel(
       expenses = data?.expenses.orEmpty(),
       customCategories = data?.customCategories.orEmpty(),
       budgets = data?.budgets.orEmpty(),
+      incomes = data?.incomes.orEmpty(),
     )
   }
 
@@ -379,6 +441,7 @@ class HisabViewModel(
       currencySymbol = symbol,
       strings = strings,
       langCode = settings.value.language.code,
+      incomes = data?.incomes.orEmpty(),
     )
   }
 
@@ -397,6 +460,7 @@ class HisabViewModel(
           budgets = parsed.budgets,
           existingCategoryIds = existingCatIds,
           existingBudgetIds = existingBudgetIds,
+          incomes = parsed.incomes,
         )
         res.onSuccess {
           _messages.tryEmit(stringsFor(settings.value.language).importSuccess)
@@ -461,6 +525,7 @@ class HisabViewModel(
             budgets = parsed.budgets,
             existingCategoryIds = currentData?.customCategories?.map { it.id }?.toSet().orEmpty(),
             existingBudgetIds = currentData?.budgets?.map { it.monthKey }?.toSet().orEmpty(),
+            incomes = parsed.incomes,
           )
           res.onSuccess {
             _messages.tryEmit(stringsFor(settings.value.language).driveRestoreSuccess)
@@ -520,10 +585,12 @@ class HisabViewModel(
     val catMap = categories.associateBy { it.id }
 
     val monthExpenses = data.expenses.filter { it.monthKey == monthKey }
+    val monthIncomes = data.incomes.filter { it.monthKey == monthKey }
     val prevMonthKey = DateFormatUtils.shiftMonthKey(monthKey, -1)
     val prevExpenses = data.expenses.filter { it.monthKey == prevMonthKey }
 
     val totalSpent = monthExpenses.sumOf { it.amount }
+    val totalIncome = monthIncomes.sumOf { it.amount }
     val prevSpent = prevExpenses.sumOf { it.amount }
 
     val budgetDoc = data.budgets.firstOrNull { it.monthKey == monthKey }
@@ -570,6 +637,8 @@ class HisabViewModel(
     return MonthlySummary(
       monthKey = monthKey,
       totalSpent = totalSpent,
+      totalIncome = totalIncome,
+      netBalance = totalIncome - totalSpent,
       prevMonthSpent = prevSpent,
       transactionCount = monthExpenses.size,
       dailyAverage = dailyAvg,

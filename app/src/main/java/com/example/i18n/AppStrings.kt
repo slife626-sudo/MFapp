@@ -155,6 +155,20 @@ data class AppStrings(
   val themeTerracotta: String,
   val themeOcean: String,
   val themePlum: String,
+  val remainingBalance: String,
+  val addedBalance: String,
+  val addBalance: String,
+  val editBalance: String,
+  val balanceTitleLabel: String,
+  val balanceFilterChip: String,
+  val expenseTypeTab: String,
+  val balanceTypeTab: String,
+  val receiveMethodLabel: String,
+  val confirmDeleteBalanceTitle: String,
+  val confirmDeleteBalanceMessage: String,
+  val overallWalletBalance: String,
+  val entryTypeExpense: String,
+  val entryTypeIncome: String,
 )
 
 val BengaliStrings = AppStrings(
@@ -299,6 +313,20 @@ val BengaliStrings = AppStrings(
   themeTerracotta = "টেরাকোটা",
   themeOcean = "ওশান",
   themePlum = "প্লাম",
+  remainingBalance = "অবশিষ্ট ব্যালেন্স",
+  addedBalance = "মোট ব্যালেন্স যোগ",
+  addBalance = "ব্যালেন্স যোগ করুন",
+  editBalance = "ব্যালেন্স সম্পাদনা করুন",
+  balanceTitleLabel = "ব্যালেন্সের উৎস (যেমন: বেতন, ক্যাশ জমা)",
+  balanceFilterChip = "ব্যালেন্স (+)",
+  expenseTypeTab = "খরচ (-)",
+  balanceTypeTab = "ব্যালেন্স (+)",
+  receiveMethodLabel = "জমার মাধ্যম",
+  confirmDeleteBalanceTitle = "ব্যালেন্স এন্ট্রি মুছে ফেলবেন?",
+  confirmDeleteBalanceMessage = "এই ব্যালেন্স জমার রেকর্ডটি স্থায়ীভাবে মুছে যাবে।",
+  overallWalletBalance = "সর্বমোট ওয়ালেট ব্যালেন্স",
+  entryTypeExpense = "খরচ",
+  entryTypeIncome = "ব্যালেন্স",
 )
 
 val EnglishStrings = AppStrings(
@@ -443,6 +471,20 @@ val EnglishStrings = AppStrings(
   themeTerracotta = "Terracotta",
   themeOcean = "Ocean",
   themePlum = "Plum",
+  remainingBalance = "Remaining Balance",
+  addedBalance = "Added Balance",
+  addBalance = "Add Balance",
+  editBalance = "Edit Balance",
+  balanceTitleLabel = "Source (e.g., Salary, Wallet Top-up)",
+  balanceFilterChip = "Deposits (+)",
+  expenseTypeTab = "Expense (-)",
+  balanceTypeTab = "Balance (+)",
+  receiveMethodLabel = "Deposit Channel",
+  confirmDeleteBalanceTitle = "Delete Balance Entry?",
+  confirmDeleteBalanceMessage = "This balance deposit record will be permanently removed.",
+  overallWalletBalance = "Overall Wallet Balance",
+  entryTypeExpense = "Expense",
+  entryTypeIncome = "Balance",
 )
 
 val HindiStrings = AppStrings(
@@ -587,6 +629,20 @@ val HindiStrings = AppStrings(
   themeTerracotta = "टेराकोटा",
   themeOcean = "ओशन",
   themePlum = "प्लम",
+  remainingBalance = "शेष बैलेंस",
+  addedBalance = "जोड़ा गया बैलेंस",
+  addBalance = "बैलेंस जोड़ें",
+  editBalance = "बैलेंस संपादित करें",
+  balanceTitleLabel = "स्रोत (जैसे: वेतन, नकद जमा)",
+  balanceFilterChip = "बैलेंस (+)",
+  expenseTypeTab = "खर्च (-)",
+  balanceTypeTab = "बैलेंस (+)",
+  receiveMethodLabel = "जमा माध्यम",
+  confirmDeleteBalanceTitle = "बैलेंस एंट्री हटाएं?",
+  confirmDeleteBalanceMessage = "यह बैलेंस रिकॉर्ड स्थायी रूप से हट जाएगा।",
+  overallWalletBalance = "कुल वॉलेट बैलेंस",
+  entryTypeExpense = "खर्च",
+  entryTypeIncome = "बैलेंस",
 )
 
 fun stringsFor(language: AppLanguage): AppStrings = when (language) {

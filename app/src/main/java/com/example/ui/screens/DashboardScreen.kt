@@ -24,6 +24,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.DeleteOutline
@@ -63,6 +65,7 @@ import com.example.data.model.CurrencyFormat
 import com.example.data.model.CurrencyOption
 import com.example.data.model.DateFormatUtils
 import com.example.data.model.Expense
+import com.example.data.model.Income
 import com.example.data.model.PaymentMethod
 import com.example.data.model.UiState
 import com.example.data.prefs.UserSettings
@@ -73,6 +76,23 @@ import com.example.ui.theme.SemanticSafeLight
 import com.example.ui.theme.SemanticWarningLight
 import com.example.viewmodel.DashboardUiData
 import java.util.Calendar
+
+const val FILTER_INCOME = "__income__"
+
+private sealed interface LedgerEntry {
+  val key: String
+  val dateMillis: Long
+
+  data class ExpenseItem(val expense: Expense) : LedgerEntry {
+    override val key: String get() = "exp_${expense.id}"
+    override val dateMillis: Long get() = expense.dateMillis
+  }
+
+  data class IncomeItem(val income: Income) : LedgerEntry {
+    override val key: String get() = "inc_${income.id}"
+    override val dateMillis: Long get() = income.dateMillis
+  }
+}
 
 @Composable
 fun DashboardScreen(
@@ -88,11 +108,15 @@ fun DashboardScreen(
   onEditExpense: (Expense) -> Unit,
   onDeleteExpense: (Expense) -> Unit,
   onNavigateToBudgets: () -> Unit,
+  onAddBalance: () -> Unit = {},
+  onEditIncome: (Income) -> Unit = {},
+  onDeleteIncome: (Income) -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
   val strings = LocalStrings.current
   val currencySymbol = CurrencyOption.fromCode(settings.currencyCode).symbol
   var expensePendingDelete by remember { mutableStateOf<Expense?>(null) }
+  var incomePendingDelete by remember { mutableStateOf<Income?>(null) }
 
   when (uiState) {
     UiState.Loading -> {
@@ -126,8 +150,20 @@ fun DashboardScreen(
       val monthExpenses = remember(data.expenses, selectedMonthKey) {
         data.expenses.filter { it.monthKey == selectedMonthKey }
       }
+      val monthIncomes = remember(data.incomes, selectedMonthKey) {
+        data.incomes.filter { it.monthKey == selectedMonthKey }
+      }
       val totalMonthSpent = remember(monthExpenses) {
         monthExpenses.sumOf { it.amount }
+      }
+      val totalMonthIncome = remember(monthIncomes) {
+        monthIncomes.sumOf { it.amount }
+      }
+      val totalAllIncome = remember(data.incomes) {
+        data.incomes.sumOf { it.amount }
+      }
+      val totalWalletBalance = remember(data.incomes, data.expenses) {
+        data.incomes.sumOf { it.amount } - data.expenses.sumOf { it.amount }
       }
       val activeBudget = remember(data.budgets, selectedMonthKey) {
         data.budgets.firstOrNull { it.monthKey == selectedMonthKey }
@@ -135,19 +171,33 @@ fun DashboardScreen(
       }
       val budgetLimit = activeBudget?.totalLimit ?: 0.0
 
-      val filteredExpenses = remember(monthExpenses, selectedCategoryFilter, searchQuery) {
-        monthExpenses.filter { exp ->
-          val matchesCat = selectedCategoryFilter == null || exp.categoryId == selectedCategoryFilter
-          val q = searchQuery.trim().lowercase()
-          val matchesQuery = q.isEmpty() ||
-            exp.title.lowercase().contains(q) ||
-            exp.note.lowercase().contains(q)
-          matchesCat && matchesQuery
+      val filteredEntries = remember(monthExpenses, monthIncomes, selectedCategoryFilter, searchQuery) {
+        val q = searchQuery.trim().lowercase()
+        val expList = if (selectedCategoryFilter == FILTER_INCOME) {
+          emptyList()
+        } else {
+          monthExpenses.filter { exp ->
+            val matchesCat = selectedCategoryFilter == null || exp.categoryId == selectedCategoryFilter
+            val matchesQuery = q.isEmpty() ||
+              exp.title.lowercase().contains(q) ||
+              exp.note.lowercase().contains(q)
+            matchesCat && matchesQuery
+          }.map { LedgerEntry.ExpenseItem(it) }
         }
+        val incList = if (selectedCategoryFilter != null && selectedCategoryFilter != FILTER_INCOME) {
+          emptyList()
+        } else {
+          monthIncomes.filter { inc ->
+            q.isEmpty() ||
+              inc.title.lowercase().contains(q) ||
+              inc.note.lowercase().contains(q)
+          }.map { LedgerEntry.IncomeItem(it) }
+        }
+        (expList + incList).sortedByDescending { it.dateMillis }
       }
 
-      val groupedByDay = remember(filteredExpenses) {
-        filteredExpenses.groupBy { DateFormatUtils.formatDayKey(it.dateMillis) }
+      val groupedByDay = remember(filteredEntries) {
+        filteredEntries.groupBy { DateFormatUtils.formatDayKey(it.dateMillis) }
       }
 
       LazyColumn(
@@ -188,12 +238,16 @@ fun DashboardScreen(
           HeroSpendingCard(
             monthKey = selectedMonthKey,
             totalSpent = totalMonthSpent,
+            totalIncome = totalMonthIncome,
+            hasAnyIncome = totalAllIncome > 0.0,
+            totalWalletBalance = totalWalletBalance,
             budgetLimit = budgetLimit,
             currencySymbol = currencySymbol,
             langCode = settings.language.code,
             onPrevMonth = { onShiftMonth(-1) },
             onNextMonth = { onShiftMonth(1) },
             onClickBudget = onNavigateToBudgets,
+            onAddBalance = onAddBalance,
           )
         }
 
@@ -225,6 +279,22 @@ fun DashboardScreen(
               onClick = { onSelectCategoryFilter(null) },
               label = { Text(strings.allCategories) },
             )
+            FilterChip(
+              selected = selectedCategoryFilter == FILTER_INCOME,
+              onClick = {
+                onSelectCategoryFilter(if (selectedCategoryFilter == FILTER_INCOME) null else FILTER_INCOME)
+              },
+              leadingIcon = {
+                Icon(
+                  imageVector = Icons.Rounded.AccountBalanceWallet,
+                  contentDescription = strings.balanceFilterChip,
+                  tint = SemanticSafeLight,
+                  modifier = Modifier.size(16.dp),
+                )
+              },
+              label = { Text(strings.balanceFilterChip) },
+              modifier = Modifier.testTag("filter_income_chip"),
+            )
             categories.forEach { cat ->
               FilterChip(
                 selected = selectedCategoryFilter == cat.id,
@@ -245,7 +315,7 @@ fun DashboardScreen(
           }
         }
 
-        if (filteredExpenses.isEmpty()) {
+        if (filteredEntries.isEmpty()) {
           item {
             Card(
               colors = CardDefaults.cardColors(
@@ -291,9 +361,10 @@ fun DashboardScreen(
             }
           }
         } else {
-          groupedByDay.forEach { (_, dayExpenses) ->
-            val firstMillis = dayExpenses.first().dateMillis
-            val daySum = dayExpenses.sumOf { it.amount }
+          groupedByDay.forEach { (_, dayEntries) ->
+            val firstMillis = dayEntries.first().dateMillis
+            val daySpentSum = dayEntries.filterIsInstance<LedgerEntry.ExpenseItem>().sumOf { it.expense.amount }
+            val dayIncomeSum = dayEntries.filterIsInstance<LedgerEntry.IncomeItem>().sumOf { it.income.amount }
             item(key = "header_${DateFormatUtils.formatDayKey(firstMillis)}") {
               Row(
                 modifier = Modifier
@@ -312,29 +383,55 @@ fun DashboardScreen(
                   style = MaterialTheme.typography.labelLarge,
                   color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(
-                  text = CurrencyFormat.format(daySum, currencySymbol),
-                  fontFamily = HisabMonoFontFamily,
-                  style = MaterialTheme.typography.labelLarge,
-                  color = MaterialTheme.colorScheme.primary,
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                  if (dayIncomeSum > 0.0) {
+                    Text(
+                      text = "+${CurrencyFormat.format(dayIncomeSum, currencySymbol)}",
+                      fontFamily = HisabMonoFontFamily,
+                      style = MaterialTheme.typography.labelLarge,
+                      color = SemanticSafeLight,
+                    )
+                  }
+                  if (daySpentSum > 0.0) {
+                    Text(
+                      text = "-${CurrencyFormat.format(daySpentSum, currencySymbol)}",
+                      fontFamily = HisabMonoFontFamily,
+                      style = MaterialTheme.typography.labelLarge,
+                      color = MaterialTheme.colorScheme.primary,
+                    )
+                  }
+                }
               }
             }
 
-            items(dayExpenses, key = { it.id }) { expense ->
-              val cat = catMap[expense.categoryId] ?: CategoryItem(
-                id = expense.categoryId,
-                name = expense.categoryId,
-                iconKey = "other",
-                colorHex = 0xFF0891B2,
-              )
-              ExpenseRowCard(
-                expense = expense,
-                category = cat,
-                currencySymbol = currencySymbol,
-                onClick = { onEditExpense(expense) },
-                onDelete = { expensePendingDelete = expense },
-              )
+            items(dayEntries, key = { it.key }) { entry ->
+              when (entry) {
+                is LedgerEntry.ExpenseItem -> {
+                  val expense = entry.expense
+                  val cat = catMap[expense.categoryId] ?: CategoryItem(
+                    id = expense.categoryId,
+                    name = expense.categoryId,
+                    iconKey = "other",
+                    colorHex = 0xFF0891B2,
+                  )
+                  ExpenseRowCard(
+                    expense = expense,
+                    category = cat,
+                    currencySymbol = currencySymbol,
+                    onClick = { onEditExpense(expense) },
+                    onDelete = { expensePendingDelete = expense },
+                  )
+                }
+
+                is LedgerEntry.IncomeItem -> {
+                  IncomeRowCard(
+                    income = entry.income,
+                    currencySymbol = currencySymbol,
+                    onClick = { onEditIncome(entry.income) },
+                    onDelete = { incomePendingDelete = entry.income },
+                  )
+                }
+              }
             }
           }
         }
@@ -361,6 +458,31 @@ fun DashboardScreen(
       },
       dismissButton = {
         TextButton(onClick = { expensePendingDelete = null }) {
+          Text(strings.cancel)
+        }
+      },
+    )
+  }
+
+  val pendingInc = incomePendingDelete
+  if (pendingInc != null) {
+    AlertDialog(
+      onDismissRequest = { incomePendingDelete = null },
+      title = { Text(strings.confirmDeleteBalanceTitle) },
+      text = { Text("${pendingInc.title} — ${strings.confirmDeleteBalanceMessage}") },
+      confirmButton = {
+        TextButton(
+          onClick = {
+            onDeleteIncome(pendingInc)
+            incomePendingDelete = null
+          },
+          colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+        ) {
+          Text(strings.delete)
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { incomePendingDelete = null }) {
           Text(strings.cancel)
         }
       },
@@ -424,12 +546,16 @@ private fun SyncStatusPill(
 private fun HeroSpendingCard(
   monthKey: String,
   totalSpent: Double,
+  totalIncome: Double,
+  hasAnyIncome: Boolean,
+  totalWalletBalance: Double,
   budgetLimit: Double,
   currencySymbol: String,
   langCode: String,
   onPrevMonth: () -> Unit,
   onNextMonth: () -> Unit,
   onClickBudget: () -> Unit,
+  onAddBalance: () -> Unit,
 ) {
   val strings = LocalStrings.current
   val primary = MaterialTheme.colorScheme.primary
@@ -444,6 +570,8 @@ private fun HeroSpendingCard(
     daysInMonth
   }
   val remainingBudget = (budgetLimit - totalSpent)
+  val monthRemainingBalance = totalIncome - totalSpent
+  val showBalanceMode = totalIncome > 0.0
 
   Card(
     shape = RoundedCornerShape(24.dp),
@@ -488,20 +616,128 @@ private fun HeroSpendingCard(
 
         Spacer(Modifier.height(6.dp))
         Text(
-          text = strings.thisMonthSpend,
+          text = if (showBalanceMode) strings.remainingBalance else strings.thisMonthSpend,
           style = MaterialTheme.typography.labelMedium,
           color = Color.White.copy(alpha = 0.85f),
         )
         Spacer(Modifier.height(4.dp))
+        val headlineText = if (showBalanceMode) {
+          if (monthRemainingBalance < 0.0) {
+            "-${CurrencyFormat.format(-monthRemainingBalance, currencySymbol)}"
+          } else {
+            CurrencyFormat.format(monthRemainingBalance, currencySymbol)
+          }
+        } else {
+          CurrencyFormat.format(totalSpent, currencySymbol)
+        }
         Text(
-          text = CurrencyFormat.format(totalSpent, currencySymbol),
+          text = headlineText,
           fontFamily = HisabMonoFontFamily,
           style = MaterialTheme.typography.displayLarge,
-          color = Color.White,
+          color = if (showBalanceMode && monthRemainingBalance < 0.0) Color(0xFFFFD6D6) else Color.White,
           fontWeight = FontWeight.Bold,
         )
 
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(12.dp))
+
+        if (showBalanceMode) {
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+          ) {
+            Surface(
+              color = Color.White.copy(alpha = 0.18f),
+              shape = RoundedCornerShape(14.dp),
+              modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(14.dp))
+                .clickable(onClick = onAddBalance)
+                .testTag("add_balance_button"),
+            ) {
+              Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+              ) {
+                Column(modifier = Modifier.weight(1f)) {
+                  Text(
+                    text = strings.addedBalance,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.82f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                  )
+                  Text(
+                    text = "+${CurrencyFormat.format(totalIncome, currencySymbol)}",
+                    fontFamily = HisabMonoFontFamily,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFBDF2DF),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                  )
+                }
+                Icon(
+                  imageVector = Icons.Rounded.Add,
+                  contentDescription = strings.addBalance,
+                  tint = Color.White,
+                  modifier = Modifier.size(18.dp),
+                )
+              }
+            }
+
+            Surface(
+              color = Color.White.copy(alpha = 0.14f),
+              shape = RoundedCornerShape(14.dp),
+              modifier = Modifier.weight(1f),
+            ) {
+              Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                Text(
+                  text = strings.totalSpent,
+                  style = MaterialTheme.typography.labelSmall,
+                  color = Color.White.copy(alpha = 0.82f),
+                  maxLines = 1,
+                  overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                  text = "-${CurrencyFormat.format(totalSpent, currencySymbol)}",
+                  fontFamily = HisabMonoFontFamily,
+                  style = MaterialTheme.typography.titleMedium,
+                  fontWeight = FontWeight.Bold,
+                  color = Color.White,
+                  maxLines = 1,
+                  overflow = TextOverflow.Ellipsis,
+                )
+              }
+            }
+          }
+          if (hasAnyIncome && kotlin.math.abs(totalWalletBalance - monthRemainingBalance) > 0.01) {
+            Spacer(Modifier.height(8.dp))
+            val overallStr = if (totalWalletBalance < 0.0) {
+              "-${CurrencyFormat.format(-totalWalletBalance, currencySymbol)}"
+            } else {
+              CurrencyFormat.format(totalWalletBalance, currencySymbol)
+            }
+            Text(
+              text = "${strings.overallWalletBalance}: $overallStr",
+              style = MaterialTheme.typography.labelMedium,
+              color = Color.White.copy(alpha = 0.9f),
+            )
+          }
+          Spacer(Modifier.height(12.dp))
+        } else if (hasAnyIncome) {
+          val overallStr = if (totalWalletBalance < 0.0) {
+            "-${CurrencyFormat.format(-totalWalletBalance, currencySymbol)}"
+          } else {
+            CurrencyFormat.format(totalWalletBalance, currencySymbol)
+          }
+          Text(
+            text = "${strings.overallWalletBalance}: $overallStr",
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White.copy(alpha = 0.9f),
+          )
+          Spacer(Modifier.height(10.dp))
+        }
 
         if (budgetLimit > 0.0) {
           val progressColor = when {
@@ -540,22 +776,157 @@ private fun HeroSpendingCard(
               )
             }
           }
-        } else {
-          Surface(
-            color = Color.White.copy(alpha = 0.2f),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-              .clip(RoundedCornerShape(12.dp))
-              .clickable(onClick = onClickBudget),
+        }
+
+        if (!showBalanceMode || budgetLimit <= 0.0) {
+          if (budgetLimit > 0.0) Spacer(Modifier.height(10.dp))
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
           ) {
-            Text(
-              text = "${strings.setBudgetHint} →",
-              style = MaterialTheme.typography.labelLarge,
-              color = Color.White,
-              modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            )
+            if (!showBalanceMode) {
+              Surface(
+                color = Color.White.copy(alpha = 0.22f),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                  .clip(RoundedCornerShape(12.dp))
+                  .clickable(onClick = onAddBalance)
+                  .testTag("add_balance_button"),
+              ) {
+                Row(
+                  modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                  verticalAlignment = Alignment.CenterVertically,
+                ) {
+                  Icon(
+                    imageVector = Icons.Rounded.Add,
+                    contentDescription = strings.addBalance,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp),
+                  )
+                  Spacer(Modifier.width(4.dp))
+                  Text(
+                    text = strings.addBalance,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White,
+                  )
+                }
+              }
+            }
+            if (budgetLimit <= 0.0) {
+              Surface(
+                color = Color.White.copy(alpha = 0.16f),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                  .clip(RoundedCornerShape(12.dp))
+                  .clickable(onClick = onClickBudget),
+              ) {
+                Text(
+                  text = "${strings.setBudgetHint} →",
+                  style = MaterialTheme.typography.labelLarge,
+                  color = Color.White,
+                  modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+              }
+            }
           }
         }
+      }
+    }
+  }
+}
+
+@Composable
+private fun IncomeRowCard(
+  income: Income,
+  currencySymbol: String,
+  onClick: () -> Unit,
+  onDelete: () -> Unit,
+) {
+  val strings = LocalStrings.current
+  val methodLabel = when (PaymentMethod.fromWire(income.paymentMethod)) {
+    PaymentMethod.CASH -> strings.cash
+    PaymentMethod.CARD -> strings.card
+    PaymentMethod.MOBILE -> strings.mobileBanking
+    PaymentMethod.BANK -> strings.bank
+  }
+
+  Card(
+    colors = CardDefaults.cardColors(
+      containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+    ),
+    shape = RoundedCornerShape(16.dp),
+    modifier = Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(16.dp))
+      .clickable(onClick = onClick)
+      .testTag("income_item_${income.id}"),
+  ) {
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 14.dp, vertical = 12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Box(
+        modifier = Modifier
+          .size(44.dp)
+          .clip(CircleShape)
+          .background(SemanticSafeLight.copy(alpha = 0.14f)),
+        contentAlignment = Alignment.Center,
+      ) {
+        Icon(
+          imageVector = Icons.Rounded.ArrowDownward,
+          contentDescription = strings.entryTypeIncome,
+          tint = SemanticSafeLight,
+          modifier = Modifier.size(22.dp),
+        )
+      }
+
+      Spacer(Modifier.width(12.dp))
+
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = income.title,
+          style = MaterialTheme.typography.titleMedium,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+          text = buildString {
+            append(strings.entryTypeIncome)
+            append(" • ")
+            append(methodLabel)
+            if (income.note.isNotBlank()) {
+              append(" • ")
+              append(income.note)
+            }
+          },
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
+
+      Spacer(Modifier.width(8.dp))
+
+      Text(
+        text = "+${CurrencyFormat.format(income.amount, currencySymbol)}",
+        fontFamily = HisabMonoFontFamily,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        color = SemanticSafeLight,
+      )
+
+      IconButton(
+        onClick = onDelete,
+        modifier = Modifier.testTag("delete_income_${income.id}"),
+      ) {
+        Icon(
+          imageVector = Icons.Rounded.DeleteOutline,
+          contentDescription = strings.delete,
+          tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
       }
     }
   }

@@ -66,6 +66,7 @@ import androidx.navigation.compose.rememberNavController
 import com.example.data.model.CategoryCatalog
 import com.example.data.model.CurrencyOption
 import com.example.data.model.Expense
+import com.example.data.model.Income
 import com.example.data.model.UiState
 import com.example.data.prefs.UserPreferencesRepository
 import com.example.data.prefs.UserSettings
@@ -228,6 +229,8 @@ private fun AuthenticatedHisabApp(
 
   var showExpenseSheet by remember { mutableStateOf(false) }
   var editingExpense by remember { mutableStateOf<Expense?>(null) }
+  var editingIncome by remember { mutableStateOf<Income?>(null) }
+  var openSheetAsIncome by remember { mutableStateOf(false) }
 
   val destinations = remember(strings) {
     listOf(
@@ -285,6 +288,8 @@ private fun AuthenticatedHisabApp(
             FloatingActionButton(
               onClick = {
                 editingExpense = null
+                editingIncome = null
+                openSheetAsIncome = false
                 showExpenseSheet = true
               },
               containerColor = MaterialTheme.colorScheme.primary,
@@ -344,11 +349,26 @@ private fun AuthenticatedHisabApp(
                   onSelectCategoryFilter = viewModel::setCategoryFilter,
                   onSearchQueryChange = viewModel::setSearchQuery,
                   onEditExpense = { exp ->
+                    editingIncome = null
                     editingExpense = exp
+                    openSheetAsIncome = false
                     showExpenseSheet = true
                   },
                   onDeleteExpense = { exp -> viewModel.deleteExpense(exp.id) },
                   onNavigateToBudgets = { navigateTo(ROUTE_BUDGETS) },
+                  onAddBalance = {
+                    editingExpense = null
+                    editingIncome = null
+                    openSheetAsIncome = true
+                    showExpenseSheet = true
+                  },
+                  onEditIncome = { inc ->
+                    editingExpense = null
+                    editingIncome = inc
+                    openSheetAsIncome = true
+                    showExpenseSheet = true
+                  },
+                  onDeleteIncome = { inc -> viewModel.deleteIncome(inc.id) },
                 )
               }
 
@@ -414,12 +434,16 @@ private fun AuthenticatedHisabApp(
     if (showExpenseSheet) {
       AddEditExpenseSheet(
         initialExpense = editingExpense,
+        initialIncome = editingIncome,
+        initialIsIncome = openSheetAsIncome,
         categories = categories,
         currencySymbol = currencySymbol,
         langCode = settings.language.code,
         onDismiss = {
           showExpenseSheet = false
           editingExpense = null
+          editingIncome = null
+          openSheetAsIncome = false
         },
         onSaveExpense = { title, amount, categoryId, method, note, dateMillis ->
           val existing = editingExpense
@@ -430,6 +454,20 @@ private fun AuthenticatedHisabApp(
           }
           showExpenseSheet = false
           editingExpense = null
+          editingIncome = null
+          openSheetAsIncome = false
+        },
+        onSaveIncome = { title, amount, method, note, dateMillis ->
+          val existing = editingIncome
+          if (existing == null) {
+            viewModel.addIncome(title, amount, method, note, dateMillis)
+          } else {
+            viewModel.updateIncome(existing.id, title, amount, method, note, dateMillis)
+          }
+          showExpenseSheet = false
+          editingExpense = null
+          editingIncome = null
+          openSheetAsIncome = false
         },
         onCreateCustomCategory = viewModel::addCustomCategory,
       )

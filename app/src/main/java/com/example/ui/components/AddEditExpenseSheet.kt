@@ -21,9 +21,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
@@ -35,6 +37,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -58,6 +63,7 @@ import com.example.data.model.CategoryCatalog
 import com.example.data.model.CategoryItem
 import com.example.data.model.DateFormatUtils
 import com.example.data.model.Expense
+import com.example.data.model.Income
 import com.example.data.model.PaymentMethod
 import com.example.i18n.LocalStrings
 import com.example.ui.theme.HisabMonoFontFamily
@@ -79,28 +85,53 @@ fun AddEditExpenseSheet(
     dateMillis: Long,
   ) -> Unit,
   onCreateCustomCategory: (name: String, iconKey: String, colorHex: Long) -> Unit,
+  initialIncome: Income? = null,
+  initialIsIncome: Boolean = false,
+  onSaveIncome: (
+    title: String,
+    amount: Double,
+    paymentMethod: PaymentMethod,
+    note: String,
+    dateMillis: Long,
+  ) -> Unit = { _, _, _, _, _ -> },
 ) {
   val strings = LocalStrings.current
   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-  var title by remember(initialExpense) { mutableStateOf(initialExpense?.title ?: "") }
-  var amountText by remember(initialExpense) {
+  val isCreatingNew = initialExpense == null && initialIncome == null
+  var isIncomeMode by remember(initialExpense, initialIncome, initialIsIncome) {
     mutableStateOf(
-      if (initialExpense != null && initialExpense.amount > 0.0) {
-        if (initialExpense.amount % 1.0 == 0.0) initialExpense.amount.toLong().toString()
-        else initialExpense.amount.toString()
+      when {
+        initialIncome != null -> true
+        initialExpense != null -> false
+        else -> initialIsIncome
+      }
+    )
+  }
+
+  var title by remember(initialExpense, initialIncome) {
+    mutableStateOf(initialExpense?.title ?: initialIncome?.title ?: "")
+  }
+  var amountText by remember(initialExpense, initialIncome) {
+    val existingAmount = initialExpense?.amount ?: initialIncome?.amount ?: 0.0
+    mutableStateOf(
+      if (existingAmount > 0.0) {
+        if (existingAmount % 1.0 == 0.0) existingAmount.toLong().toString()
+        else existingAmount.toString()
       } else ""
     )
   }
   var selectedCategoryId by remember(initialExpense) {
     mutableStateOf(initialExpense?.categoryId ?: categories.firstOrNull()?.id ?: "food")
   }
-  var selectedMethod by remember(initialExpense) {
-    mutableStateOf(PaymentMethod.fromWire(initialExpense?.paymentMethod))
+  var selectedMethod by remember(initialExpense, initialIncome) {
+    mutableStateOf(PaymentMethod.fromWire(initialExpense?.paymentMethod ?: initialIncome?.paymentMethod))
   }
-  var note by remember(initialExpense) { mutableStateOf(initialExpense?.note ?: "") }
-  var dateMillis by remember(initialExpense) {
-    mutableLongStateOf(initialExpense?.dateMillis ?: System.currentTimeMillis())
+  var note by remember(initialExpense, initialIncome) {
+    mutableStateOf(initialExpense?.note ?: initialIncome?.note ?: "")
+  }
+  var dateMillis by remember(initialExpense, initialIncome) {
+    mutableLongStateOf(initialExpense?.dateMillis ?: initialIncome?.dateMillis ?: System.currentTimeMillis())
   }
   var validationError by remember { mutableStateOf<String?>(null) }
   var showDatePicker by remember { mutableStateOf(false) }
@@ -119,9 +150,43 @@ fun AddEditExpenseSheet(
       verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
       Text(
-        text = if (initialExpense == null) strings.addExpense else strings.editExpense,
+        text = when {
+          initialIncome != null -> strings.editBalance
+          initialExpense != null -> strings.editExpense
+          isIncomeMode -> strings.addBalance
+          else -> strings.addExpense
+        },
         style = MaterialTheme.typography.titleLarge,
       )
+
+      if (isCreatingNew) {
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+          SegmentedButton(
+            selected = !isIncomeMode,
+            onClick = {
+              isIncomeMode = false
+              validationError = null
+            },
+            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+            icon = { Icon(Icons.Rounded.ReceiptLong, contentDescription = null, modifier = Modifier.size(16.dp)) },
+            modifier = Modifier.testTag("mode_expense_tab"),
+          ) {
+            Text(strings.expenseTypeTab)
+          }
+          SegmentedButton(
+            selected = isIncomeMode,
+            onClick = {
+              isIncomeMode = true
+              validationError = null
+            },
+            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+            icon = { Icon(Icons.Rounded.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(16.dp)) },
+            modifier = Modifier.testTag("mode_balance_tab"),
+          ) {
+            Text(strings.balanceTypeTab)
+          }
+        }
+      }
 
       OutlinedTextField(
         value = amountText,
@@ -156,54 +221,56 @@ fun AddEditExpenseSheet(
             validationError = null
           }
         },
-        label = { Text(strings.expenseTitleLabel) },
+        label = { Text(if (isIncomeMode) strings.balanceTitleLabel else strings.expenseTitleLabel) },
         singleLine = true,
         modifier = Modifier
           .fillMaxWidth()
           .testTag("expense_title_input"),
       )
 
-      // Category selection
-      Text(
-        text = strings.categoryLabel,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-      ) {
-        categories.forEach { cat ->
-          val selected = selectedCategoryId == cat.id
-          FilterChip(
-            selected = selected,
-            onClick = { selectedCategoryId = cat.id },
-            leadingIcon = {
-              Icon(
-                imageVector = CategoryCatalog.iconFor(cat.iconKey),
-                contentDescription = cat.name,
-                tint = Color(cat.colorHex),
-                modifier = Modifier.size(18.dp),
-              )
-            },
-            label = { Text(cat.name) },
-            modifier = Modifier.testTag("category_chip_${cat.id}"),
-          )
-        }
-        OutlinedButton(
-          onClick = { showCustomCategoryDialog = true },
-          shape = RoundedCornerShape(10.dp),
-          modifier = Modifier.testTag("add_custom_category_button"),
+      if (!isIncomeMode) {
+        // Category selection
+        Text(
+          text = strings.categoryLabel,
+          style = MaterialTheme.typography.labelLarge,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRow(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-          Icon(Icons.Rounded.Add, contentDescription = strings.addCustomCategory, Modifier.size(16.dp))
-          Spacer(Modifier.width(4.dp))
-          Text(strings.addCustomCategory)
+          categories.forEach { cat ->
+            val selected = selectedCategoryId == cat.id
+            FilterChip(
+              selected = selected,
+              onClick = { selectedCategoryId = cat.id },
+              leadingIcon = {
+                Icon(
+                  imageVector = CategoryCatalog.iconFor(cat.iconKey),
+                  contentDescription = cat.name,
+                  tint = Color(cat.colorHex),
+                  modifier = Modifier.size(18.dp),
+                )
+              },
+              label = { Text(cat.name) },
+              modifier = Modifier.testTag("category_chip_${cat.id}"),
+            )
+          }
+          OutlinedButton(
+            onClick = { showCustomCategoryDialog = true },
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.testTag("add_custom_category_button"),
+          ) {
+            Icon(Icons.Rounded.Add, contentDescription = strings.addCustomCategory, Modifier.size(16.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(strings.addCustomCategory)
+          }
         }
       }
 
-      // Payment method
+      // Payment / deposit method
       Text(
-        text = strings.paymentMethodLabel,
+        text = if (isIncomeMode) strings.receiveMethodLabel else strings.paymentMethodLabel,
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
@@ -271,14 +338,24 @@ fun AddEditExpenseSheet(
               validationError = strings.invalidInputError
               return@Button
             }
-            onSaveExpense(
-              title.trim(),
-              amount,
-              selectedCategoryId,
-              selectedMethod,
-              note.trim(),
-              dateMillis,
-            )
+            if (isIncomeMode) {
+              onSaveIncome(
+                title.trim(),
+                amount,
+                selectedMethod,
+                note.trim(),
+                dateMillis,
+              )
+            } else {
+              onSaveExpense(
+                title.trim(),
+                amount,
+                selectedCategoryId,
+                selectedMethod,
+                note.trim(),
+                dateMillis,
+              )
+            }
           },
           modifier = Modifier
             .weight(1f)

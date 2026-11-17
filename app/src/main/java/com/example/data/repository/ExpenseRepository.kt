@@ -7,6 +7,7 @@ import com.example.data.firebase.handleFirestoreError
 import com.example.data.model.CustomCategory
 import com.example.data.model.DateFormatUtils
 import com.example.data.model.Expense
+import com.example.data.model.Income
 import com.example.data.model.MonthlyBudget
 import com.example.data.model.PaymentMethod
 import com.google.firebase.Firebase
@@ -54,6 +55,34 @@ class ExpenseRepository(
       .map { snapshot ->
         val list = snapshot.toObjects(
           Expense::class.java,
+          DocumentSnapshot.ServerTimestampBehavior.ESTIMATE,
+        ).sortedByDescending { it.dateMillis }
+        SyncSnapshot(
+          items = list,
+          hasPendingWrites = snapshot.metadata.hasPendingWrites(),
+          isFromCache = snapshot.metadata.isFromCache,
+        )
+      }
+      .catch { error ->
+        val firestoreError = generateSequence(error) { it.cause }
+          .filterIsInstance<FirebaseFirestoreException>()
+          .firstOrNull()
+        if (firestoreError == null && error is CancellationException) throw error
+        val exceptionToLog = firestoreError ?: (error as? Exception)
+        if (exceptionToLog != null && auth.currentUser?.uid == userId) {
+          handleFirestoreError(exceptionToLog, OperationType.LIST, path)
+        }
+        throw error
+      }
+  }
+
+  fun observeIncomes(userId: String): Flow<SyncSnapshot<Income>> {
+    val path = "users/$userId/incomes"
+    return db.collection("users").document(userId).collection("incomes")
+      .snapshots(MetadataChanges.INCLUDE)
+      .map { snapshot ->
+        val list = snapshot.toObjects(
+          Income::class.java,
           DocumentSnapshot.ServerTimestampBehavior.ESTIMATE,
         ).sortedByDescending { it.dateMillis }
         SyncSnapshot(
@@ -226,6 +255,104 @@ class ExpenseRepository(
     }
   }
 
+  suspend fun addIncome(
+    userId: String,
+    title: String,
+    amount: Double,
+    paymentMethod: PaymentMethod,
+    note: String,
+    dateMillis: Long,
+  ): Result<Unit> {
+    var docPath = "users/$userId/incomes"
+    return try {
+      val uid = requireMatchingUserId(userId)
+      val cleanTitle = title.trim().take(120)
+      val cleanNote = note.trim().take(300)
+      val validDateMillis = if (dateMillis > 0L) dateMillis else System.currentTimeMillis()
+      val monthKey = DateFormatUtils.monthKeyFromMillis(validDateMillis)
+      require(cleanTitle.isNotEmpty()) { "Title cannot be empty" }
+      require(amount > 0.0 && amount <= 1_000_000_000.0) { "Amount out of valid range" }
+
+      val docRef = db.collection("users").document(uid).collection("incomes").document()
+      docPath = docRef.path
+      val payload = mapOf(
+        "userId" to uid,
+        "title" to cleanTitle,
+        "amount" to amount,
+        "paymentMethod" to paymentMethod.wireValue,
+        "note" to cleanNote,
+        "dateMillis" to validDateMillis,
+        "monthKey" to monthKey,
+        "createdAt" to FieldValue.serverTimestamp(),
+        "updatedAt" to FieldValue.serverTimestamp(),
+      )
+      docRef.set(payload).await()
+      Result.success(Unit)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      handleFirestoreError(e, OperationType.CREATE, docPath)
+      Result.failure(e)
+    }
+  }
+
+  suspend fun updateIncome(
+    userId: String,
+    incomeId: String,
+    title: String,
+    amount: Double,
+    paymentMethod: PaymentMethod,
+    note: String,
+    dateMillis: Long,
+  ): Result<Unit> {
+    val docPath = "users/$userId/incomes/$incomeId"
+    return try {
+      val uid = requireMatchingUserId(userId)
+      require(incomeId.isNotBlank()) { "Income ID required" }
+      val cleanTitle = title.trim().take(120)
+      val cleanNote = note.trim().take(300)
+      val validDateMillis = if (dateMillis > 0L) dateMillis else System.currentTimeMillis()
+      val monthKey = DateFormatUtils.monthKeyFromMillis(validDateMillis)
+      require(cleanTitle.isNotEmpty()) { "Title cannot be empty" }
+      require(amount > 0.0 && amount <= 1_000_000_000.0) { "Amount out of valid range" }
+
+      val docRef = db.collection("users").document(uid).collection("incomes").document(incomeId)
+      docRef.update(
+        mapOf(
+          "title" to cleanTitle,
+          "amount" to amount,
+          "paymentMethod" to paymentMethod.wireValue,
+          "note" to cleanNote,
+          "dateMillis" to validDateMillis,
+          "monthKey" to monthKey,
+          "updatedAt" to FieldValue.serverTimestamp(),
+        )
+      ).await()
+      Result.success(Unit)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      handleFirestoreError(e, OperationType.UPDATE, docPath)
+      Result.failure(e)
+    }
+  }
+
+  suspend fun deleteIncome(userId: String, incomeId: String): Result<Unit> {
+    val docPath = "users/$userId/incomes/$incomeId"
+    return try {
+      val uid = requireMatchingUserId(userId)
+      require(incomeId.isNotBlank()) { "Income ID required" }
+      db.collection("users").document(uid).collection("incomes").document(incomeId)
+        .delete().await()
+      Result.success(Unit)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      handleFirestoreError(e, OperationType.DELETE, docPath)
+      Result.failure(e)
+    }
+  }
+
   suspend fun addCustomCategory(
     userId: String,
     name: String,
@@ -348,6 +475,7 @@ class ExpenseRepository(
     budgets: List<MonthlyBudget>,
     existingCategoryIds: Set<String>,
     existingBudgetIds: Set<String>,
+    incomes: List<Income> = emptyList(),
   ): Result<Int> {
     return try {
       val uid = requireMatchingUserId(userId)
@@ -411,6 +539,30 @@ class ExpenseRepository(
             "categoryId" to exp.categoryId.trim().take(64).ifEmpty { "other" },
             "paymentMethod" to PaymentMethod.fromWire(exp.paymentMethod).wireValue,
             "note" to exp.note.trim().take(300),
+            "dateMillis" to validDate,
+            "monthKey" to monthKey,
+            "createdAt" to FieldValue.serverTimestamp(),
+            "updatedAt" to FieldValue.serverTimestamp(),
+          )
+        ).await()
+        importedCount++
+      }
+
+      for (inc in incomes) {
+        val safeTitle = inc.title.trim().take(120)
+        if (safeTitle.isEmpty() || inc.amount <= 0.0) continue
+        val validDate = if (inc.dateMillis > 0L) inc.dateMillis else System.currentTimeMillis()
+        val monthKey = DateFormatUtils.monthKeyFromMillis(validDate)
+        val safeId = sanitizeId(inc.id)
+        val colRef = db.collection("users").document(uid).collection("incomes")
+        val docRef = if (safeId.isNotEmpty()) colRef.document(safeId) else colRef.document()
+        docRef.set(
+          mapOf(
+            "userId" to uid,
+            "title" to safeTitle,
+            "amount" to inc.amount.coerceIn(0.01, 1_000_000_000.0),
+            "paymentMethod" to PaymentMethod.fromWire(inc.paymentMethod).wireValue,
+            "note" to inc.note.trim().take(300),
             "dateMillis" to validDate,
             "monthKey" to monthKey,
             "createdAt" to FieldValue.serverTimestamp(),

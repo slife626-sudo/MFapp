@@ -155,6 +155,29 @@ fun ReportsScreen(
                 modifier = Modifier.weight(1f),
               )
             }
+            if (summary.totalIncome > 0.0) {
+              Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+              ) {
+                KpiTile(
+                  label = strings.addedBalance,
+                  value = "+${CurrencyFormat.format(summary.totalIncome, currencySymbol)}",
+                  modifier = Modifier.weight(1f),
+                )
+                val netStr = if (summary.netBalance < 0.0) {
+                  "-${CurrencyFormat.format(-summary.netBalance, currencySymbol)}"
+                } else {
+                  CurrencyFormat.format(summary.netBalance, currencySymbol)
+                }
+                KpiTile(
+                  label = strings.remainingBalance,
+                  value = netStr,
+                  subtitleColor = if (summary.netBalance < 0.0) SemanticDangerLight else SemanticSafeLight,
+                  modifier = Modifier.weight(1f),
+                )
+              }
+            }
             Row(
               modifier = Modifier.fillMaxWidth(),
               horizontalArrangement = Arrangement.spacedBy(10.dp),

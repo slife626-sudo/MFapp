@@ -148,12 +148,73 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "Income": {
+      "title": "Income",
+      "description": "A user balance addition or income record owned by a user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the owner."
+        },
+        "title": {
+          "type": "string",
+          "description": "Short source/title of the balance addition (1-120 chars)."
+        },
+        "amount": {
+          "type": "number",
+          "description": "Positive balance amount added."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["CASH", "CARD", "MOBILE", "BANK"],
+          "description": "Channel where balance was added."
+        },
+        "note": {
+          "type": "string",
+          "description": "Optional note (0-300 chars)."
+        },
+        "dateMillis": {
+          "type": "integer",
+          "description": "Date/time in epoch milliseconds."
+        },
+        "monthKey": {
+          "type": "string",
+          "description": "Year-month bucket formatted as YYYY-MM."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) on creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp (FieldValue.serverTimestamp()) on update."
+        }
+      },
+      "required": [
+        "userId",
+        "title",
+        "amount",
+        "paymentMethod",
+        "note",
+        "dateMillis",
+        "monthKey",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
     "/users/{userId}/expenses/{expenseId}": {
       "schema": { "$ref": "#/entities/Expense" },
       "description": "User-scoped daily expense entries."
+    },
+    "/users/{userId}/incomes/{incomeId}": {
+      "schema": { "$ref": "#/entities/Income" },
+      "description": "User-scoped wallet balance and income additions."
     },
     "/users/{userId}/categories/{categoryId}": {
       "schema": { "$ref": "#/entities/CustomCategory" },
