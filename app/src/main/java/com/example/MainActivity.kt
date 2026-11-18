@@ -14,10 +14,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.BarChart
@@ -63,10 +65,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.compose.ui.text.style.TextOverflow
+import com.example.data.model.AccountTransfer
 import com.example.data.model.CategoryCatalog
 import com.example.data.model.CurrencyOption
 import com.example.data.model.Expense
 import com.example.data.model.Income
+import com.example.data.model.Payable
 import com.example.data.model.UiState
 import com.example.data.prefs.UserPreferencesRepository
 import com.example.data.prefs.UserSettings
@@ -76,12 +81,16 @@ import com.example.i18n.stringsFor
 import com.example.ui.auth.AuthScreen
 import com.example.ui.auth.signOutUser
 import com.example.ui.components.AddEditExpenseSheet
+import com.example.ui.components.EntrySheetMode
 import com.example.ui.components.PinLockOverlay
+import com.example.ui.components.RepayPayableDialog
 import com.example.ui.screens.BudgetsScreen
 import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.ReportsScreen
 import com.example.ui.screens.SettingsScreen
+import com.example.ui.screens.WalletsScreen
 import com.example.ui.theme.HisabTheme
+import com.example.viewmodel.AccountBalances
 import com.example.viewmodel.HisabViewModel
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
@@ -94,6 +103,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.launch
 
 const val ROUTE_DASHBOARD = "dashboard"
+const val ROUTE_WALLETS = "wallets"
 const val ROUTE_REPORTS = "reports"
 const val ROUTE_BUDGETS = "budgets"
 const val ROUTE_SETTINGS = "settings"
@@ -230,11 +240,33 @@ private fun AuthenticatedHisabApp(
   var showExpenseSheet by remember { mutableStateOf(false) }
   var editingExpense by remember { mutableStateOf<Expense?>(null) }
   var editingIncome by remember { mutableStateOf<Income?>(null) }
-  var openSheetAsIncome by remember { mutableStateOf(false) }
+  var editingTransfer by remember { mutableStateOf<AccountTransfer?>(null) }
+  var editingPayable by remember { mutableStateOf<Payable?>(null) }
+  var sheetInitialMode by remember { mutableStateOf(EntrySheetMode.EXPENSE) }
+  var repayingPayable by remember { mutableStateOf<Payable?>(null) }
+
+  fun openNewSheet(mode: EntrySheetMode) {
+    editingExpense = null
+    editingIncome = null
+    editingTransfer = null
+    editingPayable = null
+    sheetInitialMode = mode
+    showExpenseSheet = true
+  }
+
+  fun closeSheet() {
+    showExpenseSheet = false
+    editingExpense = null
+    editingIncome = null
+    editingTransfer = null
+    editingPayable = null
+    sheetInitialMode = EntrySheetMode.EXPENSE
+  }
 
   val destinations = remember(strings) {
     listOf(
       NavDestination(ROUTE_DASHBOARD, strings.navExpenses, Icons.Rounded.ReceiptLong, Icons.Outlined.ReceiptLong),
+      NavDestination(ROUTE_WALLETS, strings.navWallets, Icons.Rounded.AccountBalance, Icons.Outlined.AccountBalance),
       NavDestination(ROUTE_REPORTS, strings.navReports, Icons.Rounded.BarChart, Icons.Outlined.BarChart),
       NavDestination(ROUTE_BUDGETS, strings.navBudgets, Icons.Rounded.AccountBalanceWallet, Icons.Outlined.AccountBalanceWallet),
       NavDestination(ROUTE_SETTINGS, strings.navSettings, Icons.Rounded.Settings, Icons.Outlined.Settings),
@@ -249,9 +281,13 @@ private fun AuthenticatedHisabApp(
     }
   }
 
-  val customCategories = (uiState as? UiState.Success)?.data?.customCategories.orEmpty()
+  val successData = (uiState as? UiState.Success)?.data
+  val customCategories = successData?.customCategories.orEmpty()
   val categories = remember(strings, customCategories) {
     CategoryCatalog.mergeCategories(strings, customCategories)
+  }
+  val accountBalances = remember(successData) {
+    successData?.accountBalances() ?: AccountBalances()
   }
   val currencySymbol = CurrencyOption.fromCode(settings.currencyCode).symbol
 
@@ -276,7 +312,14 @@ private fun AuthenticatedHisabApp(
                       contentDescription = dest.label,
                     )
                   },
-                  label = { Text(dest.label) },
+                  label = {
+                    Text(
+                      text = dest.label,
+                      maxLines = 1,
+                      softWrap = false,
+                      overflow = TextOverflow.Ellipsis,
+                    )
+                  },
                   modifier = Modifier.testTag("nav_${dest.route}"),
                 )
               }
@@ -284,14 +327,9 @@ private fun AuthenticatedHisabApp(
           }
         },
         floatingActionButton = {
-          if (currentRoute == ROUTE_DASHBOARD || currentRoute == ROUTE_REPORTS) {
+          if (currentRoute == ROUTE_DASHBOARD || currentRoute == ROUTE_REPORTS || currentRoute == ROUTE_WALLETS) {
             FloatingActionButton(
-              onClick = {
-                editingExpense = null
-                editingIncome = null
-                openSheetAsIncome = false
-                showExpenseSheet = true
-              },
+              onClick = { openNewSheet(EntrySheetMode.EXPENSE) },
               containerColor = MaterialTheme.colorScheme.primary,
               contentColor = MaterialTheme.colorScheme.onPrimary,
               modifier = Modifier.testTag("fab_add_expense"),
@@ -349,26 +387,60 @@ private fun AuthenticatedHisabApp(
                   onSelectCategoryFilter = viewModel::setCategoryFilter,
                   onSearchQueryChange = viewModel::setSearchQuery,
                   onEditExpense = { exp ->
-                    editingIncome = null
+                    closeSheet()
                     editingExpense = exp
-                    openSheetAsIncome = false
                     showExpenseSheet = true
                   },
                   onDeleteExpense = { exp -> viewModel.deleteExpense(exp.id) },
                   onNavigateToBudgets = { navigateTo(ROUTE_BUDGETS) },
-                  onAddBalance = {
-                    editingExpense = null
-                    editingIncome = null
-                    openSheetAsIncome = true
-                    showExpenseSheet = true
-                  },
+                  onAddBalance = { openNewSheet(EntrySheetMode.INCOME) },
                   onEditIncome = { inc ->
-                    editingExpense = null
+                    closeSheet()
                     editingIncome = inc
-                    openSheetAsIncome = true
                     showExpenseSheet = true
                   },
                   onDeleteIncome = { inc -> viewModel.deleteIncome(inc.id) },
+                  onOpenTransfer = { openNewSheet(EntrySheetMode.TRANSFER) },
+                  onOpenBorrow = { openNewSheet(EntrySheetMode.BORROW) },
+                  onNavigateToWallets = { navigateTo(ROUTE_WALLETS) },
+                  onEditTransfer = { tr ->
+                    closeSheet()
+                    editingTransfer = tr
+                    showExpenseSheet = true
+                  },
+                  onDeleteTransfer = { tr -> viewModel.deleteTransfer(tr.id) },
+                  onEditPayable = { pay ->
+                    closeSheet()
+                    editingPayable = pay
+                    showExpenseSheet = true
+                  },
+                  onDeletePayable = { pay -> viewModel.deletePayable(pay.id) },
+                  onRepayPayable = { pay -> repayingPayable = pay },
+                  onDeleteRepayment = { pmt -> viewModel.deletePayablePayment(pmt) },
+                )
+              }
+
+              composable(ROUTE_WALLETS) {
+                WalletsScreen(
+                  uiState = uiState,
+                  settings = settings,
+                  onAddBalance = { openNewSheet(EntrySheetMode.INCOME) },
+                  onOpenTransfer = { openNewSheet(EntrySheetMode.TRANSFER) },
+                  onOpenBorrow = { openNewSheet(EntrySheetMode.BORROW) },
+                  onEditTransfer = { tr ->
+                    closeSheet()
+                    editingTransfer = tr
+                    showExpenseSheet = true
+                  },
+                  onDeleteTransfer = { tr -> viewModel.deleteTransfer(tr.id) },
+                  onEditPayable = { pay ->
+                    closeSheet()
+                    editingPayable = pay
+                    showExpenseSheet = true
+                  },
+                  onDeletePayable = { pay -> viewModel.deletePayable(pay.id) },
+                  onRepayPayable = { pay -> repayingPayable = pay },
+                  onDeleteRepayment = { pmt -> viewModel.deletePayablePayment(pmt) },
                 )
               }
 
@@ -435,16 +507,14 @@ private fun AuthenticatedHisabApp(
       AddEditExpenseSheet(
         initialExpense = editingExpense,
         initialIncome = editingIncome,
-        initialIsIncome = openSheetAsIncome,
+        initialTransfer = editingTransfer,
+        initialPayable = editingPayable,
+        initialMode = sheetInitialMode,
+        accountBalances = accountBalances,
         categories = categories,
         currencySymbol = currencySymbol,
         langCode = settings.language.code,
-        onDismiss = {
-          showExpenseSheet = false
-          editingExpense = null
-          editingIncome = null
-          openSheetAsIncome = false
-        },
+        onDismiss = { closeSheet() },
         onSaveExpense = { title, amount, categoryId, method, note, dateMillis ->
           val existing = editingExpense
           if (existing == null) {
@@ -452,10 +522,7 @@ private fun AuthenticatedHisabApp(
           } else {
             viewModel.updateExpense(existing.id, title, amount, categoryId, method, note, dateMillis)
           }
-          showExpenseSheet = false
-          editingExpense = null
-          editingIncome = null
-          openSheetAsIncome = false
+          closeSheet()
         },
         onSaveIncome = { title, amount, method, note, dateMillis ->
           val existing = editingIncome
@@ -464,12 +531,44 @@ private fun AuthenticatedHisabApp(
           } else {
             viewModel.updateIncome(existing.id, title, amount, method, note, dateMillis)
           }
-          showExpenseSheet = false
-          editingExpense = null
-          editingIncome = null
-          openSheetAsIncome = false
+          closeSheet()
+        },
+        onSaveTransfer = { fromMethod, toMethod, amount, note, dateMillis ->
+          val existing = editingTransfer
+          if (existing == null) {
+            viewModel.addTransfer(fromMethod, toMethod, amount, note, dateMillis)
+          } else {
+            viewModel.updateTransfer(existing.id, fromMethod, toMethod, amount, note, dateMillis)
+          }
+          closeSheet()
+        },
+        onSavePayable = { personName, amount, method, note, dateMillis ->
+          val existing = editingPayable
+          if (existing == null) {
+            viewModel.addPayable(personName, amount, method, note, dateMillis)
+          } else {
+            viewModel.updatePayable(existing, personName, amount, method, note, dateMillis)
+          }
+          closeSheet()
         },
         onCreateCustomCategory = viewModel::addCustomCategory,
+      )
+    }
+
+    val activePayableToRepay = repayingPayable
+    if (activePayableToRepay != null) {
+      val paidAlready = successData?.paidAmountForPayable(activePayableToRepay) ?: activePayableToRepay.paidAmount
+      RepayPayableDialog(
+        payable = activePayableToRepay,
+        paidAlready = paidAlready,
+        accountBalances = accountBalances,
+        currencySymbol = currencySymbol,
+        langCode = settings.language.code,
+        onDismiss = { repayingPayable = null },
+        onConfirm = { amount, method, note, dateMillis ->
+          viewModel.repayPayable(activePayableToRepay, amount, method, note, dateMillis)
+          repayingPayable = null
+        },
       )
     }
 

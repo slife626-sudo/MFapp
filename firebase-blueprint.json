@@ -205,6 +205,60 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "AccountTransfer": {
+      "title": "AccountTransfer",
+      "description": "An internal transfer between two user accounts (Cash, Bank, Mobile Banking, Card).",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the owner." },
+        "fromMethod": { "type": "string", "enum": ["CASH", "CARD", "MOBILE", "BANK"], "description": "Source account." },
+        "toMethod": { "type": "string", "enum": ["CASH", "CARD", "MOBILE", "BANK"], "description": "Destination account." },
+        "amount": { "type": "number", "description": "Positive transfer amount." },
+        "note": { "type": "string", "description": "Optional transfer note (0-300 chars)." },
+        "dateMillis": { "type": "integer", "description": "Transfer timestamp in epoch milliseconds." },
+        "monthKey": { "type": "string", "description": "Year-month bucket formatted as YYYY-MM." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "fromMethod", "toMethod", "amount", "note", "dateMillis", "monthKey", "createdAt", "updatedAt"]
+    },
+    "Payable": {
+      "title": "Payable",
+      "description": "A borrowed money record creating a payable owed to a lender.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the owner." },
+        "personName": { "type": "string", "description": "Name of lender / person owed (1-120 chars)." },
+        "amount": { "type": "number", "description": "Positive principal borrowed amount." },
+        "paidAmount": { "type": "number", "description": "Total amount repaid so far (>= 0)." },
+        "paymentMethod": { "type": "string", "enum": ["CASH", "CARD", "MOBILE", "BANK"], "description": "Account that received the borrowed money." },
+        "note": { "type": "string", "description": "Optional note (0-300 chars)." },
+        "dateMillis": { "type": "integer", "description": "Borrow date/time in epoch milliseconds." },
+        "monthKey": { "type": "string", "description": "Year-month bucket formatted as YYYY-MM." },
+        "settled": { "type": "boolean", "description": "Whether the payable has been fully repaid." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "personName", "amount", "paidAmount", "paymentMethod", "note", "dateMillis", "monthKey", "settled", "createdAt", "updatedAt"]
+    },
+    "PayablePayment": {
+      "title": "PayablePayment",
+      "description": "A partial or full repayment against a Payable.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the owner." },
+        "payableId": { "type": "string", "description": "ID of the parent Payable." },
+        "personName": { "type": "string", "description": "Lender name snapshot." },
+        "amount": { "type": "number", "description": "Positive repayment amount." },
+        "paymentMethod": { "type": "string", "enum": ["CASH", "CARD", "MOBILE", "BANK"], "description": "Account from which repayment was paid." },
+        "note": { "type": "string", "description": "Optional note (0-300 chars)." },
+        "dateMillis": { "type": "integer", "description": "Repayment date/time in epoch milliseconds." },
+        "monthKey": { "type": "string", "description": "Year-month bucket formatted as YYYY-MM." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "payableId", "personName", "amount", "paymentMethod", "note", "dateMillis", "monthKey", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -215,6 +269,18 @@
     "/users/{userId}/incomes/{incomeId}": {
       "schema": { "$ref": "#/entities/Income" },
       "description": "User-scoped wallet balance and income additions."
+    },
+    "/users/{userId}/transfers/{transferId}": {
+      "schema": { "$ref": "#/entities/AccountTransfer" },
+      "description": "User-scoped transfers between Cash, Bank, Mobile Banking, and Card."
+    },
+    "/users/{userId}/payables/{payableId}": {
+      "schema": { "$ref": "#/entities/Payable" },
+      "description": "User-scoped borrowed money and payables owed."
+    },
+    "/users/{userId}/payablePayments/{paymentId}": {
+      "schema": { "$ref": "#/entities/PayablePayment" },
+      "description": "User-scoped repayments against payables."
     },
     "/users/{userId}/categories/{categoryId}": {
       "schema": { "$ref": "#/entities/CustomCategory" },

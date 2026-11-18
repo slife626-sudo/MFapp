@@ -63,6 +63,54 @@ data class Income(
 
 @Keep
 @IgnoreExtraProperties
+data class AccountTransfer(
+  @DocumentId val id: String = "",
+  val userId: String = "",
+  val fromMethod: String = PaymentMethod.BANK.wireValue,
+  val toMethod: String = PaymentMethod.CASH.wireValue,
+  val amount: Double = 0.0,
+  val note: String = "",
+  val dateMillis: Long = 0L,
+  val monthKey: String = "",
+  @com.google.firebase.firestore.ServerTimestamp val createdAt: Timestamp? = null,
+  @com.google.firebase.firestore.ServerTimestamp val updatedAt: Timestamp? = null,
+)
+
+@Keep
+@IgnoreExtraProperties
+data class Payable(
+  @DocumentId val id: String = "",
+  val userId: String = "",
+  val personName: String = "",
+  val amount: Double = 0.0,
+  val paidAmount: Double = 0.0,
+  val paymentMethod: String = PaymentMethod.CASH.wireValue,
+  val note: String = "",
+  val dateMillis: Long = 0L,
+  val monthKey: String = "",
+  val settled: Boolean = false,
+  @com.google.firebase.firestore.ServerTimestamp val createdAt: Timestamp? = null,
+  @com.google.firebase.firestore.ServerTimestamp val updatedAt: Timestamp? = null,
+)
+
+@Keep
+@IgnoreExtraProperties
+data class PayablePayment(
+  @DocumentId val id: String = "",
+  val userId: String = "",
+  val payableId: String = "",
+  val personName: String = "",
+  val amount: Double = 0.0,
+  val paymentMethod: String = PaymentMethod.CASH.wireValue,
+  val note: String = "",
+  val dateMillis: Long = 0L,
+  val monthKey: String = "",
+  @com.google.firebase.firestore.ServerTimestamp val createdAt: Timestamp? = null,
+  @com.google.firebase.firestore.ServerTimestamp val updatedAt: Timestamp? = null,
+)
+
+@Keep
+@IgnoreExtraProperties
 data class CustomCategory(
   @DocumentId val id: String = "",
   val userId: String = "",

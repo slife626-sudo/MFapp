@@ -29,7 +29,9 @@ import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.CloudDone
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Handshake
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -59,6 +61,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.data.model.AccountTransfer
 import com.example.data.model.CategoryCatalog
 import com.example.data.model.CategoryItem
 import com.example.data.model.CurrencyFormat
@@ -66,10 +69,16 @@ import com.example.data.model.CurrencyOption
 import com.example.data.model.DateFormatUtils
 import com.example.data.model.Expense
 import com.example.data.model.Income
+import com.example.data.model.Payable
+import com.example.data.model.PayablePayment
 import com.example.data.model.PaymentMethod
 import com.example.data.model.UiState
 import com.example.data.prefs.UserSettings
 import com.example.i18n.LocalStrings
+import com.example.ui.components.AccountWalletsStrip
+import com.example.ui.components.PayableRowCard
+import com.example.ui.components.RepaymentRowCard
+import com.example.ui.components.TransferRowCard
 import com.example.ui.theme.HisabMonoFontFamily
 import com.example.ui.theme.SemanticDangerLight
 import com.example.ui.theme.SemanticSafeLight
@@ -78,6 +87,8 @@ import com.example.viewmodel.DashboardUiData
 import java.util.Calendar
 
 const val FILTER_INCOME = "__income__"
+const val FILTER_TRANSFER = "__transfer__"
+const val FILTER_PAYABLE = "__payable__"
 
 private sealed interface LedgerEntry {
   val key: String
@@ -91,6 +102,21 @@ private sealed interface LedgerEntry {
   data class IncomeItem(val income: Income) : LedgerEntry {
     override val key: String get() = "inc_${income.id}"
     override val dateMillis: Long get() = income.dateMillis
+  }
+
+  data class TransferItem(val transfer: AccountTransfer) : LedgerEntry {
+    override val key: String get() = "tr_${transfer.id}"
+    override val dateMillis: Long get() = transfer.dateMillis
+  }
+
+  data class PayableItem(val payable: Payable, val paidAmount: Double) : LedgerEntry {
+    override val key: String get() = "pay_${payable.id}"
+    override val dateMillis: Long get() = payable.dateMillis
+  }
+
+  data class PaymentItem(val payment: PayablePayment) : LedgerEntry {
+    override val key: String get() = "pmt_${payment.id}"
+    override val dateMillis: Long get() = payment.dateMillis
   }
 }
 
@@ -111,12 +137,24 @@ fun DashboardScreen(
   onAddBalance: () -> Unit = {},
   onEditIncome: (Income) -> Unit = {},
   onDeleteIncome: (Income) -> Unit = {},
+  onOpenTransfer: () -> Unit = {},
+  onOpenBorrow: () -> Unit = {},
+  onNavigateToWallets: () -> Unit = {},
+  onEditTransfer: (AccountTransfer) -> Unit = {},
+  onDeleteTransfer: (AccountTransfer) -> Unit = {},
+  onEditPayable: (Payable) -> Unit = {},
+  onDeletePayable: (Payable) -> Unit = {},
+  onRepayPayable: (Payable) -> Unit = {},
+  onDeleteRepayment: (PayablePayment) -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
   val strings = LocalStrings.current
   val currencySymbol = CurrencyOption.fromCode(settings.currencyCode).symbol
   var expensePendingDelete by remember { mutableStateOf<Expense?>(null) }
   var incomePendingDelete by remember { mutableStateOf<Income?>(null) }
+  var transferPendingDelete by remember { mutableStateOf<AccountTransfer?>(null) }
+  var payablePendingDelete by remember { mutableStateOf<Payable?>(null) }
+  var repaymentPendingDelete by remember { mutableStateOf<PayablePayment?>(null) }
 
   when (uiState) {
     UiState.Loading -> {
@@ -153,17 +191,25 @@ fun DashboardScreen(
       val monthIncomes = remember(data.incomes, selectedMonthKey) {
         data.incomes.filter { it.monthKey == selectedMonthKey }
       }
+      val monthTransfers = remember(data.transfers, selectedMonthKey) {
+        data.transfers.filter { it.monthKey == selectedMonthKey }
+      }
+      val monthPayables = remember(data.payables, selectedMonthKey) {
+        data.payables.filter { it.monthKey == selectedMonthKey }
+      }
+      val monthPayments = remember(data.payablePayments, selectedMonthKey) {
+        data.payablePayments.filter { it.monthKey == selectedMonthKey }
+      }
       val totalMonthSpent = remember(monthExpenses) {
         monthExpenses.sumOf { it.amount }
       }
       val totalMonthIncome = remember(monthIncomes) {
         monthIncomes.sumOf { it.amount }
       }
-      val totalAllIncome = remember(data.incomes) {
-        data.incomes.sumOf { it.amount }
-      }
-      val totalWalletBalance = remember(data.incomes, data.expenses) {
-        data.incomes.sumOf { it.amount } - data.expenses.sumOf { it.amount }
+      val balances = remember(data) { data.accountBalances() }
+      val totalUnpaidPayables = remember(data) { data.totalUnpaidPayables() }
+      val hasAnyWalletActivity = remember(data) {
+        data.incomes.isNotEmpty() || data.payables.isNotEmpty() || data.transfers.isNotEmpty()
       }
       val activeBudget = remember(data.budgets, selectedMonthKey) {
         data.budgets.firstOrNull { it.monthKey == selectedMonthKey }
@@ -171,9 +217,22 @@ fun DashboardScreen(
       }
       val budgetLimit = activeBudget?.totalLimit ?: 0.0
 
-      val filteredEntries = remember(monthExpenses, monthIncomes, selectedCategoryFilter, searchQuery) {
+      val isSpecialFilter = selectedCategoryFilter == FILTER_INCOME ||
+        selectedCategoryFilter == FILTER_TRANSFER ||
+        selectedCategoryFilter == FILTER_PAYABLE
+
+      val filteredEntries = remember(
+        monthExpenses,
+        monthIncomes,
+        monthTransfers,
+        monthPayables,
+        monthPayments,
+        data.payablePayments,
+        selectedCategoryFilter,
+        searchQuery,
+      ) {
         val q = searchQuery.trim().lowercase()
-        val expList = if (selectedCategoryFilter == FILTER_INCOME) {
+        val expList = if (isSpecialFilter) {
           emptyList()
         } else {
           monthExpenses.filter { exp ->
@@ -193,7 +252,35 @@ fun DashboardScreen(
               inc.note.lowercase().contains(q)
           }.map { LedgerEntry.IncomeItem(it) }
         }
-        (expList + incList).sortedByDescending { it.dateMillis }
+        val trList = if (selectedCategoryFilter != null && selectedCategoryFilter != FILTER_TRANSFER) {
+          emptyList()
+        } else {
+          monthTransfers.filter { tr ->
+            q.isEmpty() ||
+              tr.fromMethod.lowercase().contains(q) ||
+              tr.toMethod.lowercase().contains(q) ||
+              tr.note.lowercase().contains(q)
+          }.map { LedgerEntry.TransferItem(it) }
+        }
+        val payList = if (selectedCategoryFilter != null && selectedCategoryFilter != FILTER_PAYABLE) {
+          emptyList()
+        } else {
+          monthPayables.filter { pay ->
+            q.isEmpty() ||
+              pay.personName.lowercase().contains(q) ||
+              pay.note.lowercase().contains(q)
+          }.map { LedgerEntry.PayableItem(it, data.paidAmountForPayable(it)) }
+        }
+        val pmtList = if (selectedCategoryFilter != null && selectedCategoryFilter != FILTER_PAYABLE) {
+          emptyList()
+        } else {
+          monthPayments.filter { pmt ->
+            q.isEmpty() ||
+              pmt.personName.lowercase().contains(q) ||
+              pmt.note.lowercase().contains(q)
+          }.map { LedgerEntry.PaymentItem(it) }
+        }
+        (expList + incList + trList + payList + pmtList).sortedByDescending { it.dateMillis }
       }
 
       val groupedByDay = remember(filteredEntries) {
@@ -239,15 +326,30 @@ fun DashboardScreen(
             monthKey = selectedMonthKey,
             totalSpent = totalMonthSpent,
             totalIncome = totalMonthIncome,
-            hasAnyIncome = totalAllIncome > 0.0,
-            totalWalletBalance = totalWalletBalance,
+            hasAnyIncome = hasAnyWalletActivity,
+            totalWalletBalance = balances.total,
+            totalUnpaidPayables = totalUnpaidPayables,
             budgetLimit = budgetLimit,
             currencySymbol = currencySymbol,
             langCode = settings.language.code,
             onPrevMonth = { onShiftMonth(-1) },
             onNextMonth = { onShiftMonth(1) },
             onClickBudget = onNavigateToBudgets,
+            onClickPayables = onNavigateToWallets,
             onAddBalance = onAddBalance,
+          )
+        }
+
+        // Account Wallets Strip & Quick Actions (Cash, Bank, Mobile Banking, Card)
+        item {
+          AccountWalletsStrip(
+            balances = balances,
+            totalUnpaidPayables = totalUnpaidPayables,
+            currencySymbol = currencySymbol,
+            onClickAccounts = onNavigateToWallets,
+            onAddBalance = onAddBalance,
+            onOpenTransfer = onOpenTransfer,
+            onOpenBorrow = onOpenBorrow,
           )
         }
 
@@ -294,6 +396,38 @@ fun DashboardScreen(
               },
               label = { Text(strings.balanceFilterChip) },
               modifier = Modifier.testTag("filter_income_chip"),
+            )
+            FilterChip(
+              selected = selectedCategoryFilter == FILTER_TRANSFER,
+              onClick = {
+                onSelectCategoryFilter(if (selectedCategoryFilter == FILTER_TRANSFER) null else FILTER_TRANSFER)
+              },
+              leadingIcon = {
+                Icon(
+                  imageVector = Icons.Rounded.SwapHoriz,
+                  contentDescription = strings.transferFilterChip,
+                  tint = MaterialTheme.colorScheme.primary,
+                  modifier = Modifier.size(16.dp),
+                )
+              },
+              label = { Text(strings.transferFilterChip) },
+              modifier = Modifier.testTag("filter_transfer_chip"),
+            )
+            FilterChip(
+              selected = selectedCategoryFilter == FILTER_PAYABLE,
+              onClick = {
+                onSelectCategoryFilter(if (selectedCategoryFilter == FILTER_PAYABLE) null else FILTER_PAYABLE)
+              },
+              leadingIcon = {
+                Icon(
+                  imageVector = Icons.Rounded.Handshake,
+                  contentDescription = strings.payableFilterChip,
+                  tint = SemanticWarningLight,
+                  modifier = Modifier.size(16.dp),
+                )
+              },
+              label = { Text(strings.payableFilterChip) },
+              modifier = Modifier.testTag("filter_payable_chip"),
             )
             categories.forEach { cat ->
               FilterChip(
@@ -431,6 +565,34 @@ fun DashboardScreen(
                     onDelete = { incomePendingDelete = entry.income },
                   )
                 }
+
+                is LedgerEntry.TransferItem -> {
+                  TransferRowCard(
+                    transfer = entry.transfer,
+                    currencySymbol = currencySymbol,
+                    onClick = { onEditTransfer(entry.transfer) },
+                    onDelete = { transferPendingDelete = entry.transfer },
+                  )
+                }
+
+                is LedgerEntry.PayableItem -> {
+                  PayableRowCard(
+                    payable = entry.payable,
+                    paidAmount = entry.paidAmount,
+                    currencySymbol = currencySymbol,
+                    onClick = { onEditPayable(entry.payable) },
+                    onRepay = { onRepayPayable(entry.payable) },
+                    onDelete = { payablePendingDelete = entry.payable },
+                  )
+                }
+
+                is LedgerEntry.PaymentItem -> {
+                  RepaymentRowCard(
+                    payment = entry.payment,
+                    currencySymbol = currencySymbol,
+                    onDelete = { repaymentPendingDelete = entry.payment },
+                  )
+                }
               }
             }
           }
@@ -483,6 +645,81 @@ fun DashboardScreen(
       },
       dismissButton = {
         TextButton(onClick = { incomePendingDelete = null }) {
+          Text(strings.cancel)
+        }
+      },
+    )
+  }
+
+  val pendingTr = transferPendingDelete
+  if (pendingTr != null) {
+    AlertDialog(
+      onDismissRequest = { transferPendingDelete = null },
+      title = { Text(strings.confirmDeleteTransferTitle) },
+      text = { Text(strings.confirmDeleteTransferMessage) },
+      confirmButton = {
+        TextButton(
+          onClick = {
+            onDeleteTransfer(pendingTr)
+            transferPendingDelete = null
+          },
+          colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+        ) {
+          Text(strings.delete)
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { transferPendingDelete = null }) {
+          Text(strings.cancel)
+        }
+      },
+    )
+  }
+
+  val pendingPay = payablePendingDelete
+  if (pendingPay != null) {
+    AlertDialog(
+      onDismissRequest = { payablePendingDelete = null },
+      title = { Text(strings.confirmDeletePayableTitle) },
+      text = { Text("${pendingPay.personName} — ${strings.confirmDeletePayableMessage}") },
+      confirmButton = {
+        TextButton(
+          onClick = {
+            onDeletePayable(pendingPay)
+            payablePendingDelete = null
+          },
+          colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+        ) {
+          Text(strings.delete)
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { payablePendingDelete = null }) {
+          Text(strings.cancel)
+        }
+      },
+    )
+  }
+
+  val pendingPmt = repaymentPendingDelete
+  if (pendingPmt != null) {
+    AlertDialog(
+      onDismissRequest = { repaymentPendingDelete = null },
+      title = { Text(strings.confirmDeleteRepaymentTitle) },
+      text = { Text("${pendingPmt.personName} — ${strings.confirmDeleteRepaymentMessage}") },
+      confirmButton = {
+        TextButton(
+          onClick = {
+            onDeleteRepayment(pendingPmt)
+            repaymentPendingDelete = null
+          },
+          colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+        ) {
+          Text(strings.delete)
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { repaymentPendingDelete = null }) {
           Text(strings.cancel)
         }
       },
@@ -549,12 +786,14 @@ private fun HeroSpendingCard(
   totalIncome: Double,
   hasAnyIncome: Boolean,
   totalWalletBalance: Double,
+  totalUnpaidPayables: Double,
   budgetLimit: Double,
   currencySymbol: String,
   langCode: String,
   onPrevMonth: () -> Unit,
   onNextMonth: () -> Unit,
   onClickBudget: () -> Unit,
+  onClickPayables: () -> Unit,
   onAddBalance: () -> Unit,
 ) {
   val strings = LocalStrings.current
@@ -570,8 +809,7 @@ private fun HeroSpendingCard(
     daysInMonth
   }
   val remainingBudget = (budgetLimit - totalSpent)
-  val monthRemainingBalance = totalIncome - totalSpent
-  val showBalanceMode = totalIncome > 0.0
+  val showBalanceMode = hasAnyIncome
 
   Card(
     shape = RoundedCornerShape(24.dp),
@@ -622,10 +860,10 @@ private fun HeroSpendingCard(
         )
         Spacer(Modifier.height(4.dp))
         val headlineText = if (showBalanceMode) {
-          if (monthRemainingBalance < 0.0) {
-            "-${CurrencyFormat.format(-monthRemainingBalance, currencySymbol)}"
+          if (totalWalletBalance < 0.0) {
+            "-${CurrencyFormat.format(-totalWalletBalance, currencySymbol)}"
           } else {
-            CurrencyFormat.format(monthRemainingBalance, currencySymbol)
+            CurrencyFormat.format(totalWalletBalance, currencySymbol)
           }
         } else {
           CurrencyFormat.format(totalSpent, currencySymbol)
@@ -634,7 +872,7 @@ private fun HeroSpendingCard(
           text = headlineText,
           fontFamily = HisabMonoFontFamily,
           style = MaterialTheme.typography.displayLarge,
-          color = if (showBalanceMode && monthRemainingBalance < 0.0) Color(0xFFFFD6D6) else Color.White,
+          color = if (showBalanceMode && totalWalletBalance < 0.0) Color(0xFFFFD6D6) else Color.White,
           fontWeight = FontWeight.Bold,
         )
 
@@ -711,32 +949,37 @@ private fun HeroSpendingCard(
               }
             }
           }
-          if (hasAnyIncome && kotlin.math.abs(totalWalletBalance - monthRemainingBalance) > 0.01) {
+          if (totalUnpaidPayables > 0.0) {
             Spacer(Modifier.height(8.dp))
-            val overallStr = if (totalWalletBalance < 0.0) {
-              "-${CurrencyFormat.format(-totalWalletBalance, currencySymbol)}"
-            } else {
-              CurrencyFormat.format(totalWalletBalance, currencySymbol)
+            Surface(
+              color = Color.White.copy(alpha = 0.18f),
+              shape = RoundedCornerShape(12.dp),
+              modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onClickPayables),
+            ) {
+              Row(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+              ) {
+                Text(
+                  text = "${strings.totalPayablesLabel} →",
+                  style = MaterialTheme.typography.labelMedium,
+                  color = Color.White,
+                )
+                Text(
+                  text = CurrencyFormat.format(totalUnpaidPayables, currencySymbol),
+                  fontFamily = HisabMonoFontFamily,
+                  style = MaterialTheme.typography.labelLarge,
+                  fontWeight = FontWeight.Bold,
+                  color = Color(0xFFFFE0B2),
+                )
+              }
             }
-            Text(
-              text = "${strings.overallWalletBalance}: $overallStr",
-              style = MaterialTheme.typography.labelMedium,
-              color = Color.White.copy(alpha = 0.9f),
-            )
           }
           Spacer(Modifier.height(12.dp))
-        } else if (hasAnyIncome) {
-          val overallStr = if (totalWalletBalance < 0.0) {
-            "-${CurrencyFormat.format(-totalWalletBalance, currencySymbol)}"
-          } else {
-            CurrencyFormat.format(totalWalletBalance, currencySymbol)
-          }
-          Text(
-            text = "${strings.overallWalletBalance}: $overallStr",
-            style = MaterialTheme.typography.labelMedium,
-            color = Color.White.copy(alpha = 0.9f),
-          )
-          Spacer(Modifier.height(10.dp))
         }
 
         if (budgetLimit > 0.0) {

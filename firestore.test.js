@@ -315,3 +315,113 @@ test("Owner can create, update, and delete wallet balance/income entries; cross-
   // Owner delete succeeds
   await assertSucceeds(incRef.delete());
 });
+
+test("Owner can create, update, delete transfers, payables, and payablePayments; rejects invalid and cross-user writes", async () => {
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+  const unauthDb = testEnv.unauthenticatedContext().firestore();
+  const created = new Date(Date.now() - 10000);
+
+  await assertFails(unauthDb.collection("users").doc(ALICE_UID).collection("transfers").get());
+  await assertFails(unauthDb.collection("users").doc(ALICE_UID).collection("payables").get());
+  await assertFails(unauthDb.collection("users").doc(ALICE_UID).collection("payablePayments").get());
+
+  // Valid transfer: BANK -> CASH
+  const trRef = aliceDb.collection("users").doc(ALICE_UID).collection("transfers").doc("tr_1");
+  await assertSucceeds(
+    trRef.set({
+      userId: ALICE_UID,
+      fromMethod: "BANK",
+      toMethod: "CASH",
+      amount: 5000,
+      note: "Withdraw to wallet",
+      dateMillis: Date.now() - 5000,
+      monthKey: "2026-11",
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+
+  // Reject same-account transfer (CASH -> CASH)
+  await assertFails(
+    aliceDb.collection("users").doc(ALICE_UID).collection("transfers").doc("tr_same").set({
+      userId: ALICE_UID,
+      fromMethod: "CASH",
+      toMethod: "CASH",
+      amount: 500,
+      note: "",
+      dateMillis: Date.now(),
+      monthKey: "2026-11",
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+
+  // Partial update on transfer
+  await assertSucceeds(
+    trRef.update({
+      fromMethod: "BANK",
+      toMethod: "MOBILE",
+      amount: 3000,
+      note: "Updated to bKash",
+      dateMillis: Date.now() - 4000,
+      monthKey: "2026-11",
+      updatedAt: new Date(Date.now() - 1000),
+    })
+  );
+
+  // Valid Payable (borrowed money)
+  const payRef = aliceDb.collection("users").doc(ALICE_UID).collection("payables").doc("pay_1");
+  await assertSucceeds(
+    payRef.set({
+      userId: ALICE_UID,
+      personName: "Karim",
+      amount: 3000,
+      paidAmount: 0,
+      paymentMethod: "MOBILE",
+      note: "Emergency loan",
+      dateMillis: Date.now() - 5000,
+      monthKey: "2026-11",
+      settled: false,
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+
+  // Valid PayablePayment (partial repayment)
+  const repayRef = aliceDb.collection("users").doc(ALICE_UID).collection("payablePayments").doc("repay_1");
+  await assertSucceeds(
+    repayRef.set({
+      userId: ALICE_UID,
+      payableId: "pay_1",
+      personName: "Karim",
+      amount: 1000,
+      paymentMethod: "BANK",
+      note: "First installment",
+      dateMillis: Date.now() - 2000,
+      monthKey: "2026-11",
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+
+  // Update Payable paidAmount
+  await assertSucceeds(
+    payRef.update({
+      paidAmount: 1000,
+      settled: false,
+      updatedAt: new Date(Date.now() - 1000),
+    })
+  );
+
+  // Cross-user isolation
+  await assertFails(bobDb.collection("users").doc(ALICE_UID).collection("transfers").get());
+  await assertFails(bobDb.collection("users").doc(ALICE_UID).collection("payables").get());
+  await assertFails(bobDb.collection("users").doc(ALICE_UID).collection("payablePayments").get());
+  await assertFails(bobDb.collection("users").doc(ALICE_UID).collection("payables").doc("pay_1").delete());
+
+  // Owner deletes succeed
+  await assertSucceeds(repayRef.delete());
+  await assertSucceeds(payRef.delete());
+  await assertSucceeds(trRef.delete());
+});

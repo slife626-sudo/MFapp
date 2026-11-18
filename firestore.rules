@@ -112,6 +112,78 @@ service cloud.firestore {
              data.updatedAt <= request.time;
     }
 
+    function isValidTransfer(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.fromMethod in ['CASH', 'CARD', 'MOBILE', 'BANK'] &&
+             data.toMethod in ['CASH', 'CARD', 'MOBILE', 'BANK'] &&
+             data.fromMethod != data.toMethod &&
+             data.amount is number &&
+             data.amount > 0 &&
+             data.amount <= 1000000000 &&
+             data.note is string &&
+             data.note.size() <= 300 &&
+             data.dateMillis is int &&
+             data.dateMillis > 0 &&
+             isValidMonthKey(data.monthKey) &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    function isValidPayable(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.personName is string &&
+             data.personName.size() >= 1 &&
+             data.personName.size() <= 120 &&
+             data.amount is number &&
+             data.amount > 0 &&
+             data.amount <= 1000000000 &&
+             data.paidAmount is number &&
+             data.paidAmount >= 0 &&
+             data.paidAmount <= 1000000000 &&
+             data.paymentMethod in ['CASH', 'CARD', 'MOBILE', 'BANK'] &&
+             data.note is string &&
+             data.note.size() <= 300 &&
+             data.dateMillis is int &&
+             data.dateMillis > 0 &&
+             isValidMonthKey(data.monthKey) &&
+             data.settled is bool &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    function isValidPayablePayment(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.payableId is string &&
+             data.payableId.size() >= 1 &&
+             data.payableId.size() <= 128 &&
+             data.personName is string &&
+             data.personName.size() >= 1 &&
+             data.personName.size() <= 120 &&
+             data.amount is number &&
+             data.amount > 0 &&
+             data.amount <= 1000000000 &&
+             data.paymentMethod in ['CASH', 'CARD', 'MOBILE', 'BANK'] &&
+             data.note is string &&
+             data.note.size() <= 300 &&
+             data.dateMillis is int &&
+             data.dateMillis > 0 &&
+             isValidMonthKey(data.monthKey) &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
     match /users/{userId}/expenses/{expenseId} {
       allow list: if isOwner(userId);
       allow get: if isOwner(userId) && isValidId(expenseId);
@@ -150,6 +222,67 @@ service cloud.firestore {
                        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'amount', 'paymentMethod', 'note', 'dateMillis', 'monthKey', 'updatedAt']);
 
       allow delete: if isOwner(userId) && isValidId(incomeId);
+    }
+
+    match /users/{userId}/transfers/{transferId} {
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(transferId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(transferId) &&
+                       incoming().keys().hasAll(['userId', 'fromMethod', 'toMethod', 'amount', 'note', 'dateMillis', 'monthKey', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'fromMethod', 'toMethod', 'amount', 'note', 'dateMillis', 'monthKey', 'createdAt', 'updatedAt']) &&
+                       isValidTransfer(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(transferId) &&
+                       isValidTransfer(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['fromMethod', 'toMethod', 'amount', 'note', 'dateMillis', 'monthKey', 'updatedAt']);
+
+      allow delete: if isOwner(userId) && isValidId(transferId);
+    }
+
+    match /users/{userId}/payables/{payableId} {
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(payableId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(payableId) &&
+                       incoming().keys().hasAll(['userId', 'personName', 'amount', 'paidAmount', 'paymentMethod', 'note', 'dateMillis', 'monthKey', 'settled', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'personName', 'amount', 'paidAmount', 'paymentMethod', 'note', 'dateMillis', 'monthKey', 'settled', 'createdAt', 'updatedAt']) &&
+                       isValidPayable(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(payableId) &&
+                       isValidPayable(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['personName', 'amount', 'paidAmount', 'paymentMethod', 'note', 'dateMillis', 'monthKey', 'settled', 'updatedAt']);
+
+      allow delete: if isOwner(userId) && isValidId(payableId);
+    }
+
+    match /users/{userId}/payablePayments/{paymentId} {
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(paymentId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(paymentId) &&
+                       incoming().keys().hasAll(['userId', 'payableId', 'personName', 'amount', 'paymentMethod', 'note', 'dateMillis', 'monthKey', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'payableId', 'personName', 'amount', 'paymentMethod', 'note', 'dateMillis', 'monthKey', 'createdAt', 'updatedAt']) &&
+                       isValidPayablePayment(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(paymentId) &&
+                       isValidPayablePayment(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().payableId == existing().payableId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['personName', 'amount', 'paymentMethod', 'note', 'dateMillis', 'monthKey', 'updatedAt']);
+
+      allow delete: if isOwner(userId) && isValidId(paymentId);
     }
 
     match /users/{userId}/categories/{categoryId} {
