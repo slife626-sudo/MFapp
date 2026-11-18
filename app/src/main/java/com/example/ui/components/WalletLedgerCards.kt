@@ -17,14 +17,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Handshake
+import androidx.compose.material.icons.rounded.NorthEast
 import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -50,6 +54,8 @@ import com.example.data.model.CurrencyFormat
 import com.example.data.model.Payable
 import com.example.data.model.PayablePayment
 import com.example.data.model.PaymentMethod
+import com.example.data.model.Receivable
+import com.example.data.model.ReceivablePayment
 import com.example.i18n.AppStrings
 import com.example.i18n.LocalStrings
 import com.example.ui.theme.HisabMonoFontFamily
@@ -67,6 +73,7 @@ fun AccountWalletsStrip(
   onAddBalance: () -> Unit,
   onOpenTransfer: () -> Unit,
   onOpenBorrow: () -> Unit,
+  onOpenLend: () -> Unit = {},
 ) {
   val strings = LocalStrings.current
 
@@ -116,47 +123,136 @@ fun AccountWalletsStrip(
     }
 
     Row(
-      modifier = Modifier.fillMaxWidth(),
+      modifier = Modifier
+        .fillMaxWidth()
+        .horizontalScroll(rememberScrollState()),
       horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
       OutlinedButton(
         onClick = onAddBalance,
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
         shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.weight(1f).testTag("quick_add_balance_btn"),
+        modifier = Modifier.testTag("quick_add_balance_btn"),
       ) {
         Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(4.dp))
-        Text(strings.balanceTypeTab, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(strings.balanceTypeTab, maxLines = 1)
       }
       OutlinedButton(
         onClick = onOpenTransfer,
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
         shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.weight(1f).testTag("quick_transfer_btn"),
+        modifier = Modifier.testTag("quick_transfer_btn"),
       ) {
         Icon(Icons.Rounded.SwapHoriz, contentDescription = null, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(4.dp))
-        Text(strings.quickTransferAction, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(strings.quickTransferAction, maxLines = 1)
       }
       OutlinedButton(
         onClick = onOpenBorrow,
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
         shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.weight(1f).testTag("quick_borrow_btn"),
+        modifier = Modifier.testTag("quick_borrow_btn"),
       ) {
         Icon(Icons.Rounded.Handshake, contentDescription = null, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(4.dp))
         Text(
-          text = if (totalUnpaidPayables > 0.0) {
-            "${strings.quickBorrowAction}"
-          } else {
-            strings.quickBorrowAction
-          },
+          text = if (totalUnpaidPayables > 0.0) strings.quickBorrowAction else strings.quickBorrowAction,
+          maxLines = 1,
+        )
+      }
+      OutlinedButton(
+        onClick = onOpenLend,
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.testTag("quick_lend_btn"),
+      ) {
+        Icon(Icons.Rounded.NorthEast, contentDescription = null, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(4.dp))
+        Text(strings.quickLendAction, maxLines = 1)
+      }
+    }
+  }
+}
+
+@Composable
+fun MarketQuickEntryCard(
+  activeCount: Int,
+  sharedReceivedCount: Int,
+  onClick: () -> Unit,
+) {
+  val strings = LocalStrings.current
+  Card(
+    colors = CardDefaults.cardColors(
+      containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
+    ),
+    shape = RoundedCornerShape(18.dp),
+    modifier = Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(18.dp))
+      .clickable(onClick = onClick)
+      .testTag("open_market_list_btn"),
+  ) {
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 14.dp, vertical = 12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Box(
+        modifier = Modifier
+          .size(40.dp)
+          .clip(CircleShape)
+          .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+        contentAlignment = Alignment.Center,
+      ) {
+        Icon(
+          imageVector = Icons.Rounded.ShoppingBag,
+          contentDescription = strings.marketListTitle,
+          tint = MaterialTheme.colorScheme.primary,
+        )
+      }
+      Spacer(Modifier.width(12.dp))
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = strings.marketCardTitle,
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.SemiBold,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+        val subtitle = when {
+          sharedReceivedCount > 0 -> "$activeCount ${strings.activeBadge} • $sharedReceivedCount ${strings.sharedByLabel}"
+          activeCount > 0 -> "$activeCount ${strings.activeBadge}"
+          else -> strings.marketCardSubtitle
+        }
+        Text(
+          text = subtitle,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
         )
       }
+      if (activeCount > 0) {
+        Surface(
+          color = MaterialTheme.colorScheme.primary,
+          shape = RoundedCornerShape(50),
+        ) {
+          Text(
+            text = activeCount.toString(),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp),
+          )
+        }
+        Spacer(Modifier.width(4.dp))
+      }
+      Icon(
+        imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+        contentDescription = strings.marketListTitle,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
     }
   }
 }
@@ -467,6 +563,185 @@ fun RepaymentRowCard(
         color = MaterialTheme.colorScheme.onSurface,
       )
       IconButton(onClick = onDelete, modifier = Modifier.testTag("delete_repayment_${payment.id}")) {
+        Icon(
+          imageVector = Icons.Rounded.DeleteOutline,
+          contentDescription = strings.delete,
+          tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+    }
+  }
+}
+
+@Composable
+fun ReceivableRowCard(
+  receivable: Receivable,
+  collectedAmount: Double,
+  currencySymbol: String,
+  onClick: () -> Unit,
+  onCollect: () -> Unit,
+  onDelete: () -> Unit,
+) {
+  val strings = LocalStrings.current
+  val method = methodLabel(receivable.paymentMethod, strings)
+  val remaining = (receivable.amount - collectedAmount).coerceAtLeast(0.0)
+  val isSettled = remaining <= 0.001
+
+  Card(
+    colors = CardDefaults.cardColors(
+      containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+    ),
+    shape = RoundedCornerShape(16.dp),
+    modifier = Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(16.dp))
+      .clickable(onClick = onClick)
+      .testTag("receivable_item_${receivable.id}"),
+  ) {
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 14.dp, vertical = 12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Box(
+        modifier = Modifier
+          .size(44.dp)
+          .clip(CircleShape)
+          .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+        contentAlignment = Alignment.Center,
+      ) {
+        Icon(
+          imageVector = Icons.Rounded.NorthEast,
+          contentDescription = strings.entryTypeLend,
+          tint = MaterialTheme.colorScheme.primary,
+          modifier = Modifier.size(22.dp),
+        )
+      }
+      Spacer(Modifier.width(12.dp))
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = receivable.personName,
+          style = MaterialTheme.typography.titleMedium,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+        val statusText = if (isSettled) {
+          strings.settledBadge
+        } else {
+          "${strings.dueAmountLabel}: ${CurrencyFormat.format(remaining, currencySymbol)}"
+        }
+        Text(
+          text = "$method • $statusText",
+          style = MaterialTheme.typography.bodyMedium,
+          color = if (isSettled) SemanticSafeLight else MaterialTheme.colorScheme.primary,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
+      Spacer(Modifier.width(6.dp))
+      Column(horizontalAlignment = Alignment.End) {
+        Text(
+          text = "-${CurrencyFormat.format(receivable.amount, currencySymbol)}",
+          fontFamily = HisabMonoFontFamily,
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.Bold,
+          color = MaterialTheme.colorScheme.onSurface,
+        )
+        if (!isSettled) {
+          FilledTonalButton(
+            onClick = onCollect,
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+            modifier = Modifier
+              .padding(top = 4.dp)
+              .testTag("quick_collect_${receivable.id}"),
+          ) {
+            Text(strings.collectButton, style = MaterialTheme.typography.labelSmall)
+          }
+        }
+      }
+      IconButton(onClick = onDelete, modifier = Modifier.testTag("delete_receivable_${receivable.id}")) {
+        Icon(
+          imageVector = Icons.Rounded.DeleteOutline,
+          contentDescription = strings.delete,
+          tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+    }
+  }
+}
+
+@Composable
+fun CollectionRowCard(
+  payment: ReceivablePayment,
+  currencySymbol: String,
+  onDelete: () -> Unit,
+) {
+  val strings = LocalStrings.current
+  val method = methodLabel(payment.paymentMethod, strings)
+
+  Card(
+    colors = CardDefaults.cardColors(
+      containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+    ),
+    shape = RoundedCornerShape(16.dp),
+    modifier = Modifier
+      .fillMaxWidth()
+      .testTag("collection_item_${payment.id}"),
+  ) {
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 14.dp, vertical = 12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Box(
+        modifier = Modifier
+          .size(44.dp)
+          .clip(CircleShape)
+          .background(SemanticSafeLight.copy(alpha = 0.14f)),
+        contentAlignment = Alignment.Center,
+      ) {
+        Icon(
+          imageVector = Icons.Rounded.ArrowDownward,
+          contentDescription = strings.entryTypeCollection,
+          tint = SemanticSafeLight,
+          modifier = Modifier.size(22.dp),
+        )
+      }
+      Spacer(Modifier.width(12.dp))
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = payment.personName,
+          style = MaterialTheme.typography.titleMedium,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+          text = buildString {
+            append(strings.entryTypeCollection)
+            append(" • ")
+            append(method)
+            if (payment.note.isNotBlank()) {
+              append(" • ")
+              append(payment.note)
+            }
+          },
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
+      Spacer(Modifier.width(8.dp))
+      Text(
+        text = "+${CurrencyFormat.format(payment.amount, currencySymbol)}",
+        fontFamily = HisabMonoFontFamily,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        color = SemanticSafeLight,
+      )
+      IconButton(onClick = onDelete, modifier = Modifier.testTag("delete_collection_${payment.id}")) {
         Icon(
           imageVector = Icons.Rounded.DeleteOutline,
           contentDescription = strings.delete,

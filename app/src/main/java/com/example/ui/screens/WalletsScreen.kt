@@ -2,6 +2,7 @@ package com.example.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,25 +17,26 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountBalance
-import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CreditCard
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.NorthEast
 import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.PhoneAndroid
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -44,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -64,6 +67,8 @@ import com.example.data.model.DateFormatUtils
 import com.example.data.model.Payable
 import com.example.data.model.PayablePayment
 import com.example.data.model.PaymentMethod
+import com.example.data.model.Receivable
+import com.example.data.model.ReceivablePayment
 import com.example.data.model.UiState
 import com.example.data.prefs.UserSettings
 import com.example.i18n.AppStrings
@@ -87,6 +92,11 @@ fun WalletsScreen(
   onDeletePayable: (Payable) -> Unit,
   onRepayPayable: (Payable) -> Unit,
   onDeleteRepayment: (PayablePayment) -> Unit,
+  onOpenLend: () -> Unit = {},
+  onEditReceivable: (Receivable) -> Unit = {},
+  onDeleteReceivable: (Receivable) -> Unit = {},
+  onCollectReceivable: (Receivable) -> Unit = {},
+  onDeleteCollection: (ReceivablePayment) -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
   val strings = LocalStrings.current
@@ -94,6 +104,9 @@ fun WalletsScreen(
   var transferPendingDelete by remember { mutableStateOf<AccountTransfer?>(null) }
   var payablePendingDelete by remember { mutableStateOf<Payable?>(null) }
   var repaymentPendingDelete by remember { mutableStateOf<PayablePayment?>(null) }
+  var receivablePendingDelete by remember { mutableStateOf<Receivable?>(null) }
+  var collectionPendingDelete by remember { mutableStateOf<ReceivablePayment?>(null) }
+  var selectedDebtTab by remember { mutableIntStateOf(0) } // 0 = Payables, 1 = Receivables
 
   when (uiState) {
     UiState.Loading -> {
@@ -112,11 +125,18 @@ fun WalletsScreen(
       val data = uiState.data
       val balances = remember(data) { data.accountBalances() }
       val totalUnpaidPayables = remember(data) { data.totalUnpaidPayables() }
+      val totalUnpaidReceivables = remember(data) { data.totalUnpaidReceivables() }
       val unpaidPayables = remember(data.payables, data.payablePayments) {
         data.payables.filter { p -> (p.amount - data.paidAmountForPayable(p)) > 0.001 }
       }
       val settledPayables = remember(data.payables, data.payablePayments) {
         data.payables.filter { p -> (p.amount - data.paidAmountForPayable(p)) <= 0.001 }
+      }
+      val unpaidReceivables = remember(data.receivables, data.receivablePayments) {
+        data.receivables.filter { r -> (r.amount - data.collectedAmountForReceivable(r)) > 0.001 }
+      }
+      val settledReceivables = remember(data.receivables, data.receivablePayments) {
+        data.receivables.filter { r -> (r.amount - data.collectedAmountForReceivable(r)) <= 0.001 }
       }
 
       LazyColumn(
@@ -196,27 +216,63 @@ fun WalletsScreen(
                   }
                 }
 
+                if (totalUnpaidReceivables > 0.0) {
+                  Surface(
+                    color = Color.White.copy(alpha = 0.16f),
+                    shape = RoundedCornerShape(12.dp),
+                  ) {
+                    Row(
+                      modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                      horizontalArrangement = Arrangement.SpaceBetween,
+                      verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                      Text(
+                        text = strings.totalReceivablesLabel,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.White,
+                      )
+                      Text(
+                        text = CurrencyFormat.format(totalUnpaidReceivables, currencySymbol),
+                        fontFamily = HisabMonoFontFamily,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFBDF2DF),
+                      )
+                    }
+                  }
+                }
+
                 Row(
-                  modifier = Modifier.fillMaxWidth(),
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
                   horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                   QuickWhiteActionChip(
                     icon = Icons.Rounded.Add,
                     label = strings.balanceTypeTab,
                     onClick = onAddBalance,
-                    modifier = Modifier.weight(1f).testTag("wallet_add_balance_btn"),
+                    modifier = Modifier.testTag("wallet_add_balance_btn"),
                   )
                   QuickWhiteActionChip(
                     icon = Icons.Rounded.SwapHoriz,
                     label = strings.quickTransferAction,
                     onClick = onOpenTransfer,
-                    modifier = Modifier.weight(1f).testTag("wallet_transfer_btn"),
+                    modifier = Modifier.testTag("wallet_transfer_btn"),
                   )
                   QuickWhiteActionChip(
                     icon = Icons.Rounded.Add,
                     label = strings.quickBorrowAction,
                     onClick = onOpenBorrow,
-                    modifier = Modifier.weight(1f).testTag("wallet_borrow_btn"),
+                    modifier = Modifier.testTag("wallet_borrow_btn"),
+                  )
+                  QuickWhiteActionChip(
+                    icon = Icons.Rounded.NorthEast,
+                    label = strings.quickLendAction,
+                    onClick = onOpenLend,
+                    modifier = Modifier.testTag("wallet_lend_btn"),
                   )
                 }
               }
@@ -281,99 +337,216 @@ fun WalletsScreen(
           }
         }
 
-        // Unpaid Payables Section
+        // Segmented Filter: Payables (দেনা) vs Receivables (পাওনা)
         item {
           Row(
             modifier = Modifier
               .fillMaxWidth()
               .padding(top = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
           ) {
-            Text(
-              text = strings.unpaidPayablesTitle,
-              style = MaterialTheme.typography.titleMedium,
-              fontWeight = FontWeight.SemiBold,
+            FilterChip(
+              selected = selectedDebtTab == 0,
+              onClick = { selectedDebtTab = 0 },
+              label = { Text("${strings.payablesTab} (${unpaidPayables.size})") },
+              modifier = Modifier.testTag("tab_payables_chip"),
             )
-            TextButton(onClick = onOpenBorrow) {
-              Text(strings.quickBorrowAction)
-            }
+            FilterChip(
+              selected = selectedDebtTab == 1,
+              onClick = { selectedDebtTab = 1 },
+              label = { Text("${strings.receivablesTab} (${unpaidReceivables.size})") },
+              modifier = Modifier.testTag("tab_receivables_chip"),
+            )
           }
         }
 
-        if (unpaidPayables.isEmpty()) {
+        if (selectedDebtTab == 0) {
+          // Unpaid Payables Section
           item {
-            Card(
-              colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-              ),
-              shape = RoundedCornerShape(16.dp),
+            Row(
               modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.SpaceBetween,
+              verticalAlignment = Alignment.CenterVertically,
             ) {
-              Row(
-                modifier = Modifier
-                  .fillMaxWidth()
-                  .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-              ) {
-                Icon(
-                  imageVector = Icons.Rounded.CheckCircle,
-                  contentDescription = null,
-                  tint = SemanticSafeLight,
-                )
-                Text(
-                  text = strings.noPayablesEmpty,
-                  style = MaterialTheme.typography.bodyMedium,
-                  color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+              Text(
+                text = strings.unpaidPayablesTitle,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+              )
+              TextButton(onClick = onOpenBorrow) {
+                Text(strings.quickBorrowAction)
               }
             }
           }
-        } else {
-          items(unpaidPayables, key = { "unpaid_${it.id}" }) { payable ->
-            val paidSum = data.paidAmountForPayable(payable)
-            val payments = data.payablePayments.filter { it.payableId == payable.id }
-            PayableCard(
-              payable = payable,
-              paidAmount = paidSum,
-              payments = payments,
-              currencySymbol = currencySymbol,
-              langCode = settings.language.code,
-              strings = strings,
-              onRepay = { onRepayPayable(payable) },
-              onEdit = { onEditPayable(payable) },
-              onDelete = { payablePendingDelete = payable },
-              onDeletePayment = { repaymentPendingDelete = it },
-            )
-          }
-        }
 
-        // Settled Payables
-        if (settledPayables.isNotEmpty()) {
-          item {
-            Text(
-              text = strings.settledPayablesTitle,
-              style = MaterialTheme.typography.titleMedium,
-              fontWeight = FontWeight.SemiBold,
-              modifier = Modifier.padding(top = 6.dp),
-            )
+          if (unpaidPayables.isEmpty()) {
+            item {
+              Card(
+                colors = CardDefaults.cardColors(
+                  containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                ),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth(),
+              ) {
+                Row(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                  verticalAlignment = Alignment.CenterVertically,
+                  horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                  Icon(
+                    imageVector = Icons.Rounded.CheckCircle,
+                    contentDescription = null,
+                    tint = SemanticSafeLight,
+                  )
+                  Text(
+                    text = strings.noPayablesEmpty,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                  )
+                }
+              }
+            }
+          } else {
+            items(unpaidPayables, key = { "unpaid_${it.id}" }) { payable ->
+              val paidSum = data.paidAmountForPayable(payable)
+              val payments = data.payablePayments.filter { it.payableId == payable.id }
+              PayableCard(
+                payable = payable,
+                paidAmount = paidSum,
+                payments = payments,
+                currencySymbol = currencySymbol,
+                langCode = settings.language.code,
+                strings = strings,
+                onRepay = { onRepayPayable(payable) },
+                onEdit = { onEditPayable(payable) },
+                onDelete = { payablePendingDelete = payable },
+                onDeletePayment = { repaymentPendingDelete = it },
+              )
+            }
           }
-          items(settledPayables, key = { "settled_${it.id}" }) { payable ->
-            val paidSum = data.paidAmountForPayable(payable)
-            val payments = data.payablePayments.filter { it.payableId == payable.id }
-            PayableCard(
-              payable = payable,
-              paidAmount = paidSum,
-              payments = payments,
-              currencySymbol = currencySymbol,
-              langCode = settings.language.code,
-              strings = strings,
-              onRepay = null,
-              onEdit = { onEditPayable(payable) },
-              onDelete = { payablePendingDelete = payable },
-              onDeletePayment = { repaymentPendingDelete = it },
-            )
+
+          // Settled Payables
+          if (settledPayables.isNotEmpty()) {
+            item {
+              Text(
+                text = strings.settledPayablesTitle,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 6.dp),
+              )
+            }
+            items(settledPayables, key = { "settled_${it.id}" }) { payable ->
+              val paidSum = data.paidAmountForPayable(payable)
+              val payments = data.payablePayments.filter { it.payableId == payable.id }
+              PayableCard(
+                payable = payable,
+                paidAmount = paidSum,
+                payments = payments,
+                currencySymbol = currencySymbol,
+                langCode = settings.language.code,
+                strings = strings,
+                onRepay = null,
+                onEdit = { onEditPayable(payable) },
+                onDelete = { payablePendingDelete = payable },
+                onDeletePayment = { repaymentPendingDelete = it },
+              )
+            }
+          }
+        } else {
+          // Unpaid Receivables Section
+          item {
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.SpaceBetween,
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Text(
+                text = strings.unpaidReceivablesTitle,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+              )
+              TextButton(onClick = onOpenLend) {
+                Text(strings.quickLendAction)
+              }
+            }
+          }
+
+          if (unpaidReceivables.isEmpty()) {
+            item {
+              Card(
+                colors = CardDefaults.cardColors(
+                  containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                ),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth(),
+              ) {
+                Row(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                  verticalAlignment = Alignment.CenterVertically,
+                  horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                  Icon(
+                    imageVector = Icons.Rounded.CheckCircle,
+                    contentDescription = null,
+                    tint = SemanticSafeLight,
+                  )
+                  Text(
+                    text = strings.noReceivablesEmpty,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                  )
+                }
+              }
+            }
+          } else {
+            items(unpaidReceivables, key = { "unpaid_rec_${it.id}" }) { rec ->
+              val collectedSum = data.collectedAmountForReceivable(rec)
+              val collections = data.receivablePayments.filter { it.receivableId == rec.id }
+              ReceivableCard(
+                receivable = rec,
+                collectedAmount = collectedSum,
+                collections = collections,
+                currencySymbol = currencySymbol,
+                langCode = settings.language.code,
+                strings = strings,
+                onCollect = { onCollectReceivable(rec) },
+                onEdit = { onEditReceivable(rec) },
+                onDelete = { receivablePendingDelete = rec },
+                onDeleteCollection = { collectionPendingDelete = it },
+              )
+            }
+          }
+
+          // Settled Receivables
+          if (settledReceivables.isNotEmpty()) {
+            item {
+              Text(
+                text = strings.settledReceivablesTitle,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 6.dp),
+              )
+            }
+            items(settledReceivables, key = { "settled_rec_${it.id}" }) { rec ->
+              val collectedSum = data.collectedAmountForReceivable(rec)
+              val collections = data.receivablePayments.filter { it.receivableId == rec.id }
+              ReceivableCard(
+                receivable = rec,
+                collectedAmount = collectedSum,
+                collections = collections,
+                currencySymbol = currencySymbol,
+                langCode = settings.language.code,
+                strings = strings,
+                onCollect = null,
+                onEdit = { onEditReceivable(rec) },
+                onDelete = { receivablePendingDelete = rec },
+                onDeleteCollection = { collectionPendingDelete = it },
+              )
+            }
           }
         }
 
@@ -458,6 +631,46 @@ fun WalletsScreen(
       },
       dismissButton = {
         TextButton(onClick = { repaymentPendingDelete = null }) { Text(strings.cancel) }
+      },
+    )
+  }
+
+  receivablePendingDelete?.let { rec ->
+    AlertDialog(
+      onDismissRequest = { receivablePendingDelete = null },
+      title = { Text(strings.confirmDeleteReceivableTitle) },
+      text = { Text("${rec.personName} — ${strings.confirmDeleteReceivableMessage}") },
+      confirmButton = {
+        TextButton(
+          onClick = {
+            onDeleteReceivable(rec)
+            receivablePendingDelete = null
+          },
+          colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+        ) { Text(strings.delete) }
+      },
+      dismissButton = {
+        TextButton(onClick = { receivablePendingDelete = null }) { Text(strings.cancel) }
+      },
+    )
+  }
+
+  collectionPendingDelete?.let { col ->
+    AlertDialog(
+      onDismissRequest = { collectionPendingDelete = null },
+      title = { Text(strings.confirmDeleteCollectionTitle) },
+      text = { Text("${col.personName} — ${strings.confirmDeleteCollectionMessage}") },
+      confirmButton = {
+        TextButton(
+          onClick = {
+            onDeleteCollection(col)
+            collectionPendingDelete = null
+          },
+          colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+        ) { Text(strings.delete) }
+      },
+      dismissButton = {
+        TextButton(onClick = { collectionPendingDelete = null }) { Text(strings.cancel) }
       },
     )
   }
@@ -808,6 +1021,186 @@ private fun TransferHistoryCard(
           contentDescription = strings.delete,
           tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+      }
+    }
+  }
+}
+
+@Composable
+private fun ReceivableCard(
+  receivable: Receivable,
+  collectedAmount: Double,
+  collections: List<ReceivablePayment>,
+  currencySymbol: String,
+  langCode: String,
+  strings: AppStrings,
+  onCollect: (() -> Unit)?,
+  onEdit: () -> Unit,
+  onDelete: () -> Unit,
+  onDeleteCollection: (ReceivablePayment) -> Unit,
+) {
+  val remaining = (receivable.amount - collectedAmount).coerceAtLeast(0.0)
+  val isSettled = remaining <= 0.001
+  val progress = if (receivable.amount > 0.0) (collectedAmount / receivable.amount).toFloat().coerceIn(0f, 1f) else 1f
+  val methodLabel = paymentMethodLabel(receivable.paymentMethod, strings)
+
+  Card(
+    colors = CardDefaults.cardColors(
+      containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+    ),
+    shape = RoundedCornerShape(18.dp),
+    modifier = Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(18.dp))
+      .clickable(onClick = onEdit),
+  ) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(14.dp),
+      verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(
+            text = receivable.personName,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+          Text(
+            text = "$methodLabel • ${DateFormatUtils.formatDateCompact(receivable.dateMillis, langCode)}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+        if (isSettled) {
+          Surface(
+            color = SemanticSafeLight.copy(alpha = 0.16f),
+            shape = RoundedCornerShape(50),
+          ) {
+            Text(
+              text = strings.settledBadge,
+              style = MaterialTheme.typography.labelMedium,
+              color = SemanticSafeLight,
+              fontWeight = FontWeight.SemiBold,
+              modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+          }
+        } else if (onCollect != null) {
+          FilledTonalButton(
+            onClick = onCollect,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier.testTag("collect_btn_${receivable.id}"),
+          ) {
+            Text(strings.collectButton)
+          }
+        }
+        IconButton(onClick = onDelete) {
+          Icon(
+            imageVector = Icons.Rounded.DeleteOutline,
+            contentDescription = strings.delete,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+      }
+
+      LinearProgressIndicator(
+        progress = { progress },
+        color = if (isSettled) SemanticSafeLight else MaterialTheme.colorScheme.primary,
+        trackColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier
+          .fillMaxWidth()
+          .height(6.dp)
+          .clip(RoundedCornerShape(3.dp)),
+      )
+
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+      ) {
+        Text(
+          text = "${strings.collectedAmountLabel}: ${CurrencyFormat.format(collectedAmount, currencySymbol)} / ${CurrencyFormat.format(receivable.amount, currencySymbol)}",
+          fontFamily = HisabMonoFontFamily,
+          style = MaterialTheme.typography.labelMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (!isSettled) {
+          Text(
+            text = "${strings.dueAmountLabel}: ${CurrencyFormat.format(remaining, currencySymbol)}",
+            fontFamily = HisabMonoFontFamily,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+          )
+        }
+      }
+
+      if (receivable.note.isNotBlank()) {
+        Text(
+          text = receivable.note,
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      }
+
+      if (collections.isNotEmpty()) {
+        Spacer(Modifier.height(2.dp))
+        Text(
+          text = strings.collectionHistoryTitle,
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        collections.forEach { col ->
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .clip(RoundedCornerShape(10.dp))
+              .background(MaterialTheme.colorScheme.surfaceContainerLow)
+              .padding(horizontal = 10.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Column(modifier = Modifier.weight(1f)) {
+              Text(
+                text = "${paymentMethodLabel(col.paymentMethod, strings)} • ${DateFormatUtils.formatDateCompact(col.dateMillis, langCode)}",
+                style = MaterialTheme.typography.labelMedium,
+              )
+              if (col.note.isNotBlank()) {
+                Text(
+                  text = col.note,
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
+                  maxLines = 1,
+                  overflow = TextOverflow.Ellipsis,
+                )
+              }
+            }
+            Text(
+              text = "+${CurrencyFormat.format(col.amount, currencySymbol)}",
+              fontFamily = HisabMonoFontFamily,
+              style = MaterialTheme.typography.labelLarge,
+              fontWeight = FontWeight.SemiBold,
+              color = SemanticSafeLight,
+            )
+            IconButton(
+              onClick = { onDeleteCollection(col) },
+              modifier = Modifier.size(32.dp),
+            ) {
+              Icon(
+                imageVector = Icons.Rounded.DeleteOutline,
+                contentDescription = strings.delete,
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+          }
+        }
       }
     }
   }

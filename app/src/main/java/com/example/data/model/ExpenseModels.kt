@@ -111,6 +111,73 @@ data class PayablePayment(
 
 @Keep
 @IgnoreExtraProperties
+data class Receivable(
+  @DocumentId val id: String = "",
+  val userId: String = "",
+  val personName: String = "",
+  val amount: Double = 0.0,
+  val collectedAmount: Double = 0.0,
+  val paymentMethod: String = PaymentMethod.CASH.wireValue,
+  val note: String = "",
+  val dateMillis: Long = 0L,
+  val monthKey: String = "",
+  val settled: Boolean = false,
+  @com.google.firebase.firestore.ServerTimestamp val createdAt: Timestamp? = null,
+  @com.google.firebase.firestore.ServerTimestamp val updatedAt: Timestamp? = null,
+)
+
+@Keep
+@IgnoreExtraProperties
+data class ReceivablePayment(
+  @DocumentId val id: String = "",
+  val userId: String = "",
+  val receivableId: String = "",
+  val personName: String = "",
+  val amount: Double = 0.0,
+  val paymentMethod: String = PaymentMethod.CASH.wireValue,
+  val note: String = "",
+  val dateMillis: Long = 0L,
+  val monthKey: String = "",
+  @com.google.firebase.firestore.ServerTimestamp val createdAt: Timestamp? = null,
+  @com.google.firebase.firestore.ServerTimestamp val updatedAt: Timestamp? = null,
+)
+
+@Keep
+@IgnoreExtraProperties
+data class MarketList(
+  @DocumentId val id: String = "",
+  val ownerUid: String = "",
+  val ownerEmail: String = "",
+  val ownerName: String = "",
+  val title: String = "",
+  val sharedWithEmail: String = "",
+  val memberEmails: List<String> = emptyList(),
+  val note: String = "",
+  val completed: Boolean = false,
+  val dateMillis: Long = 0L,
+  @com.google.firebase.firestore.ServerTimestamp val createdAt: Timestamp? = null,
+  @com.google.firebase.firestore.ServerTimestamp val updatedAt: Timestamp? = null,
+)
+
+@Keep
+@IgnoreExtraProperties
+data class MarketListItem(
+  @DocumentId val id: String = "",
+  val listId: String = "",
+  val ownerUid: String = "",
+  val memberEmails: List<String> = emptyList(),
+  val addedByEmail: String = "",
+  val name: String = "",
+  val quantity: String = "",
+  val estimatedPrice: Double = 0.0,
+  val bought: Boolean = false,
+  val note: String = "",
+  @com.google.firebase.firestore.ServerTimestamp val createdAt: Timestamp? = null,
+  @com.google.firebase.firestore.ServerTimestamp val updatedAt: Timestamp? = null,
+)
+
+@Keep
+@IgnoreExtraProperties
 data class CustomCategory(
   @DocumentId val id: String = "",
   val userId: String = "",

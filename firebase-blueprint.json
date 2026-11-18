@@ -259,6 +259,81 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "payableId", "personName", "amount", "paymentMethod", "note", "dateMillis", "monthKey", "createdAt", "updatedAt"]
+    },
+    "Receivable": {
+      "title": "Receivable",
+      "description": "A lent money record creating a receivable owed by a borrower.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the owner." },
+        "personName": { "type": "string", "description": "Name of borrower / person who owes money (1-120 chars)." },
+        "amount": { "type": "number", "description": "Positive principal lent amount." },
+        "collectedAmount": { "type": "number", "description": "Total amount collected back so far (>= 0)." },
+        "paymentMethod": { "type": "string", "enum": ["CASH", "CARD", "MOBILE", "BANK"], "description": "Account from which money was lent." },
+        "note": { "type": "string", "description": "Optional note (0-300 chars)." },
+        "dateMillis": { "type": "integer", "description": "Lending date/time in epoch milliseconds." },
+        "monthKey": { "type": "string", "description": "Year-month bucket formatted as YYYY-MM." },
+        "settled": { "type": "boolean", "description": "Whether the receivable has been fully collected." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "personName", "amount", "collectedAmount", "paymentMethod", "note", "dateMillis", "monthKey", "settled", "createdAt", "updatedAt"]
+    },
+    "ReceivablePayment": {
+      "title": "ReceivablePayment",
+      "description": "A partial or full collection received against a Receivable.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the owner." },
+        "receivableId": { "type": "string", "description": "ID of the parent Receivable." },
+        "personName": { "type": "string", "description": "Borrower name snapshot." },
+        "amount": { "type": "number", "description": "Positive collected amount." },
+        "paymentMethod": { "type": "string", "enum": ["CASH", "CARD", "MOBILE", "BANK"], "description": "Account into which collection was received." },
+        "note": { "type": "string", "description": "Optional note (0-300 chars)." },
+        "dateMillis": { "type": "integer", "description": "Collection date/time in epoch milliseconds." },
+        "monthKey": { "type": "string", "description": "Year-month bucket formatted as YYYY-MM." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "receivableId", "personName", "amount", "paymentMethod", "note", "dateMillis", "monthKey", "createdAt", "updatedAt"]
+    },
+    "MarketList": {
+      "title": "MarketList",
+      "description": "A personal or email-shared market/grocery shopping list.",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string", "description": "Firebase Auth UID of the creator." },
+        "ownerEmail": { "type": "string", "description": "Normalized lowercased creator email." },
+        "ownerName": { "type": "string", "description": "Creator display name snapshot." },
+        "title": { "type": "string", "description": "Market list title (1-120 chars)." },
+        "sharedWithEmail": { "type": "string", "description": "Normalized lowercased recipient email or empty." },
+        "memberEmails": { "type": "array", "description": "Bounded list (1-10) of normalized emails allowed to access this list." },
+        "note": { "type": "string", "description": "Optional note (0-300 chars)." },
+        "completed": { "type": "boolean", "description": "Whether shopping for this list is finished." },
+        "dateMillis": { "type": "integer", "description": "Target/created date in epoch milliseconds." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "ownerEmail", "ownerName", "title", "sharedWithEmail", "memberEmails", "note", "completed", "dateMillis", "createdAt", "updatedAt"]
+    },
+    "MarketListItem": {
+      "title": "MarketListItem",
+      "description": "A grocery item inside a MarketList with denormalized member authorization.",
+      "type": "object",
+      "properties": {
+        "listId": { "type": "string", "description": "Parent MarketList document ID." },
+        "ownerUid": { "type": "string", "description": "Creator UID from parent MarketList." },
+        "memberEmails": { "type": "array", "description": "Denormalized bounded list (1-10) of member emails." },
+        "addedByEmail": { "type": "string", "description": "Normalized email of user who added this item." },
+        "name": { "type": "string", "description": "Item name (1-120 chars)." },
+        "quantity": { "type": "string", "description": "Item quantity text (0-40 chars)." },
+        "estimatedPrice": { "type": "number", "description": "Estimated or actual price (>= 0)." },
+        "bought": { "type": "boolean", "description": "Whether the item has been bought." },
+        "note": { "type": "string", "description": "Optional note (0-200 chars)." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["listId", "ownerUid", "memberEmails", "addedByEmail", "name", "quantity", "estimatedPrice", "bought", "note", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -282,6 +357,14 @@
       "schema": { "$ref": "#/entities/PayablePayment" },
       "description": "User-scoped repayments against payables."
     },
+    "/users/{userId}/receivables/{receivableId}": {
+      "schema": { "$ref": "#/entities/Receivable" },
+      "description": "User-scoped lent money and receivables owed to the user."
+    },
+    "/users/{userId}/receivablePayments/{paymentId}": {
+      "schema": { "$ref": "#/entities/ReceivablePayment" },
+      "description": "User-scoped collections received against receivables."
+    },
     "/users/{userId}/categories/{categoryId}": {
       "schema": { "$ref": "#/entities/CustomCategory" },
       "description": "User-scoped custom expense categories."
@@ -289,6 +372,14 @@
     "/users/{userId}/budgets/{budgetId}": {
       "schema": { "$ref": "#/entities/MonthlyBudget" },
       "description": "User-scoped monthly and default budget limits."
+    },
+    "/marketLists/{listId}": {
+      "schema": { "$ref": "#/entities/MarketList" },
+      "description": "Email-shared grocery/market lists accessible to creator and shared spouse/partner."
+    },
+    "/marketLists/{listId}/items/{itemId}": {
+      "schema": { "$ref": "#/entities/MarketListItem" },
+      "description": "Grocery items inside a market list with denormalized membership."
     }
   }
 }

@@ -20,14 +20,19 @@ import com.example.data.model.CustomCategory
 import com.example.data.model.DateFormatUtils
 import com.example.data.model.Expense
 import com.example.data.model.Income
+import com.example.data.model.MarketList
+import com.example.data.model.MarketListItem
 import com.example.data.model.MonthlyBudget
 import com.example.data.model.Payable
 import com.example.data.model.PayablePayment
 import com.example.data.model.PaymentMethod
+import com.example.data.model.Receivable
+import com.example.data.model.ReceivablePayment
 import com.example.data.model.UiState
 import com.example.data.prefs.UserPreferencesRepository
 import com.example.data.prefs.UserSettings
 import com.example.data.repository.ExpenseRepository
+import com.example.data.repository.MarketListRepository
 import com.example.data.repository.SyncSnapshot
 import com.example.i18n.AppLanguage
 import com.example.i18n.stringsFor
@@ -36,6 +41,7 @@ import com.example.ui.theme.AppThemePalette
 import com.example.ui.theme.ThemeMode
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -47,6 +53,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -97,6 +105,8 @@ data class DashboardUiData(
   val transfers: List<AccountTransfer> = emptyList(),
   val payables: List<Payable> = emptyList(),
   val payablePayments: List<PayablePayment> = emptyList(),
+  val receivables: List<Receivable> = emptyList(),
+  val receivablePayments: List<ReceivablePayment> = emptyList(),
   val customCategories: List<CustomCategory>,
   val budgets: List<MonthlyBudget>,
   val hasPendingWrites: Boolean,
@@ -110,7 +120,9 @@ data class DashboardUiData(
       val trOut = transfers.filter { PaymentMethod.fromWire(it.fromMethod) == method }.sumOf { it.amount }
       val borrowed = payables.filter { PaymentMethod.fromWire(it.paymentMethod) == method }.sumOf { it.amount }
       val repaid = payablePayments.filter { PaymentMethod.fromWire(it.paymentMethod) == method }.sumOf { it.amount }
-      return inc - exp + trIn - trOut + borrowed - repaid
+      val lentOut = receivables.filter { PaymentMethod.fromWire(it.paymentMethod) == method }.sumOf { it.amount }
+      val collectedBack = receivablePayments.filter { PaymentMethod.fromWire(it.paymentMethod) == method }.sumOf { it.amount }
+      return inc - exp + trIn - trOut + borrowed - repaid - lentOut + collectedBack
     }
     return AccountBalances(
       cash = balanceFor(PaymentMethod.CASH),
@@ -127,13 +139,33 @@ data class DashboardUiData(
 
   fun totalUnpaidPayables(): Double =
     payables.sumOf { p -> (p.amount - paidAmountForPayable(p)).coerceAtLeast(0.0) }
+
+  fun collectedAmountForReceivable(receivable: Receivable): Double {
+    val matching = receivablePayments.filter { it.receivableId == receivable.id }
+    return if (matching.isNotEmpty()) matching.sumOf { it.amount } else receivable.collectedAmount
+  }
+
+  fun totalUnpaidReceivables(): Double =
+    receivables.sumOf { r -> (r.amount - collectedAmountForReceivable(r)).coerceAtLeast(0.0) }
 }
 
+private data class WalletOpsSnapshot(
+  val transfers: SyncSnapshot<AccountTransfer>,
+  val payables: SyncSnapshot<Payable>,
+  val payablePayments: SyncSnapshot<PayablePayment>,
+  val receivables: SyncSnapshot<Receivable>,
+  val receivablePayments: SyncSnapshot<ReceivablePayment>,
+)
+
+@OptIn(ExperimentalCoroutinesApi::class)
 class HisabViewModel(
   private val repository: ExpenseRepository,
+  private val marketRepository: MarketListRepository,
   private val prefsRepo: UserPreferencesRepository,
   private val appContext: Context,
   private val currentUserId: String,
+  private val currentUserEmail: String = "",
+  private val currentUserName: String = "",
 ) : ViewModel() {
 
   val settings: StateFlow<UserSettings> = prefsRepo.settingsFlow
@@ -160,17 +192,52 @@ class HisabViewModel(
   private val _driveFiles = MutableStateFlow<List<DriveBackupFile>>(emptyList())
   val driveFiles: StateFlow<List<DriveBackupFile>> = _driveFiles.asStateFlow()
 
+  private val _selectedMarketListId = MutableStateFlow<String?>(null)
+  val selectedMarketListId: StateFlow<String?> = _selectedMarketListId.asStateFlow()
+
   private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 8)
   val messages = _messages.asSharedFlow()
 
   private var pinInitialized = false
 
+  val marketLists: StateFlow<List<MarketList>> = marketRepository
+    .observeMarketLists(currentUserId, currentUserEmail)
+    .catch { error ->
+      val firestoreError = generateSequence(error) { it.cause }
+        .filterIsInstance<FirebaseFirestoreException>()
+        .firstOrNull()
+      if (firestoreError == null && error is CancellationException) throw error
+      Log.w(TAG, "Error observing market lists", firestoreError ?: error)
+      emit(emptyList())
+    }
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
+
+  val selectedMarketItems: StateFlow<List<MarketListItem>> = _selectedMarketListId
+    .flatMapLatest { listId ->
+      if (listId.isNullOrBlank()) {
+        flowOf(emptyList())
+      } else {
+        marketRepository.observeMarketItems(listId, currentUserId, currentUserEmail)
+          .catch { error ->
+            val firestoreError = generateSequence(error) { it.cause }
+              .filterIsInstance<FirebaseFirestoreException>()
+              .firstOrNull()
+            if (firestoreError == null && error is CancellationException) throw error
+            Log.w(TAG, "Error observing market items", firestoreError ?: error)
+            emit(emptyList())
+          }
+      }
+    }
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
+
   private val walletOpsFlow = combine(
     repository.observeTransfers(currentUserId),
     repository.observePayables(currentUserId),
     repository.observePayablePayments(currentUserId),
-  ) { trSnap, paySnap, pmtSnap ->
-    Triple(trSnap, paySnap, pmtSnap)
+    repository.observeReceivables(currentUserId),
+    repository.observeReceivablePayments(currentUserId),
+  ) { trSnap, paySnap, pmtSnap, recSnap, recPmtSnap ->
+    WalletOpsSnapshot(trSnap, paySnap, pmtSnap, recSnap, recPmtSnap)
   }
 
   val dashboardState: StateFlow<UiState<DashboardUiData>> = combine(
@@ -180,7 +247,7 @@ class HisabViewModel(
     repository.observeCustomCategories(currentUserId),
     repository.observeBudgets(currentUserId),
   ) { expSnap: SyncSnapshot<Expense>, incSnap: SyncSnapshot<Income>, walletOps, cats: List<CustomCategory>, budgets: List<MonthlyBudget> ->
-    val (trSnap, paySnap, pmtSnap) = walletOps
+    val (trSnap, paySnap, pmtSnap, recSnap, recPmtSnap) = walletOps
     UiState.Success(
       DashboardUiData(
         expenses = expSnap.items,
@@ -188,18 +255,24 @@ class HisabViewModel(
         transfers = trSnap.items,
         payables = paySnap.items,
         payablePayments = pmtSnap.items,
+        receivables = recSnap.items,
+        receivablePayments = recPmtSnap.items,
         customCategories = cats,
         budgets = budgets,
         hasPendingWrites = expSnap.hasPendingWrites ||
           incSnap.hasPendingWrites ||
           trSnap.hasPendingWrites ||
           paySnap.hasPendingWrites ||
-          pmtSnap.hasPendingWrites,
+          pmtSnap.hasPendingWrites ||
+          recSnap.hasPendingWrites ||
+          recPmtSnap.hasPendingWrites,
         isFromCache = expSnap.isFromCache &&
           incSnap.isFromCache &&
           trSnap.isFromCache &&
           paySnap.isFromCache &&
-          pmtSnap.isFromCache,
+          pmtSnap.isFromCache &&
+          recSnap.isFromCache &&
+          recPmtSnap.isFromCache,
       )
     ) as UiState<DashboardUiData>
   }
@@ -602,6 +675,262 @@ class HisabViewModel(
     }
   }
 
+  fun addReceivable(
+    personName: String,
+    amount: Double,
+    paymentMethod: PaymentMethod,
+    note: String,
+    dateMillis: Long,
+  ) {
+    viewModelScope.launch {
+      repository.addReceivable(
+        userId = currentUserId,
+        personName = personName,
+        amount = amount,
+        paymentMethod = paymentMethod,
+        note = note,
+        dateMillis = dateMillis,
+      ).onFailure { err ->
+        _messages.tryEmit(err.localizedMessage ?: "Failed to add lent record")
+      }
+    }
+  }
+
+  fun updateReceivable(
+    receivable: Receivable,
+    personName: String,
+    amount: Double,
+    paymentMethod: PaymentMethod,
+    note: String,
+    dateMillis: Long,
+  ) {
+    viewModelScope.launch {
+      repository.updateReceivable(
+        userId = currentUserId,
+        receivable = receivable,
+        personName = personName,
+        amount = amount,
+        paymentMethod = paymentMethod,
+        note = note,
+        dateMillis = dateMillis,
+      ).onFailure { err ->
+        _messages.tryEmit(err.localizedMessage ?: "Failed to update receivable")
+      }
+    }
+  }
+
+  fun deleteReceivable(receivableId: String) {
+    val currentData = (dashboardState.value as? UiState.Success)?.data
+    val relatedPaymentIds = currentData?.receivablePayments
+      ?.filter { it.receivableId == receivableId }
+      ?.map { it.id }
+      .orEmpty()
+    viewModelScope.launch {
+      repository.deleteReceivable(currentUserId, receivableId, relatedPaymentIds).onFailure { err ->
+        _messages.tryEmit(err.localizedMessage ?: "Failed to delete receivable")
+      }
+    }
+  }
+
+  fun collectReceivable(
+    receivable: Receivable,
+    amount: Double,
+    paymentMethod: PaymentMethod,
+    note: String,
+    dateMillis: Long,
+  ) {
+    val currentData = (dashboardState.value as? UiState.Success)?.data
+    val currentCollected = currentData?.collectedAmountForReceivable(receivable) ?: receivable.collectedAmount
+    viewModelScope.launch {
+      repository.addReceivablePayment(
+        userId = currentUserId,
+        receivable = receivable,
+        amount = amount,
+        paymentMethod = paymentMethod,
+        note = note,
+        dateMillis = dateMillis,
+        currentCollectedSum = currentCollected,
+      ).onFailure { err ->
+        _messages.tryEmit(err.localizedMessage ?: "Failed to record collection")
+      }
+    }
+  }
+
+  fun deleteReceivablePayment(payment: ReceivablePayment) {
+    val currentData = (dashboardState.value as? UiState.Success)?.data
+    val parent = currentData?.receivables?.firstOrNull { it.id == payment.receivableId }
+    val newCollectedSum = currentData?.receivablePayments
+      ?.filter { it.receivableId == payment.receivableId && it.id != payment.id }
+      ?.sumOf { it.amount }
+      ?: ((parent?.collectedAmount ?: 0.0) - payment.amount).coerceAtLeast(0.0)
+    viewModelScope.launch {
+      repository.deleteReceivablePayment(
+        userId = currentUserId,
+        payment = payment,
+        parentReceivable = parent,
+        newCollectedSumAfterDelete = newCollectedSum,
+      ).onFailure { err ->
+        _messages.tryEmit(err.localizedMessage ?: "Failed to delete collection")
+      }
+    }
+  }
+
+  fun selectMarketList(listId: String?) {
+    _selectedMarketListId.value = listId
+  }
+
+  fun createMarketList(
+    title: String,
+    sharedWithEmail: String,
+    note: String,
+  ) {
+    viewModelScope.launch {
+      marketRepository.createMarketList(
+        ownerUid = currentUserId,
+        ownerEmail = currentUserEmail,
+        ownerName = currentUserName,
+        title = title,
+        sharedWithEmail = sharedWithEmail,
+        note = note,
+      ).onSuccess { newId ->
+        _selectedMarketListId.value = newId
+      }.onFailure { err ->
+        _messages.tryEmit(err.localizedMessage ?: "Failed to create market list")
+      }
+    }
+  }
+
+  fun updateMarketListAndShare(
+    list: MarketList,
+    title: String,
+    sharedWithEmail: String,
+    note: String,
+  ) {
+    viewModelScope.launch {
+      marketRepository.updateMarketListAndShare(
+        list = list,
+        title = title,
+        sharedWithEmail = sharedWithEmail,
+        note = note,
+      ).onSuccess {
+        _messages.tryEmit(stringsFor(settings.value.language).sharedListSavedMsg)
+      }.onFailure { err ->
+        _messages.tryEmit(err.localizedMessage ?: "Failed to update market list")
+      }
+    }
+  }
+
+  fun toggleMarketListCompleted(listId: String, completed: Boolean) {
+    viewModelScope.launch {
+      marketRepository.toggleMarketListCompleted(listId, completed)
+        .onFailure { err -> _messages.tryEmit(err.localizedMessage ?: "Failed to update status") }
+    }
+  }
+
+  fun deleteMarketList(list: MarketList) {
+    viewModelScope.launch {
+      marketRepository.deleteMarketList(list.ownerUid, list.id)
+        .onSuccess {
+          if (_selectedMarketListId.value == list.id) {
+            _selectedMarketListId.value = null
+          }
+        }
+        .onFailure { err -> _messages.tryEmit(err.localizedMessage ?: "Failed to delete market list") }
+    }
+  }
+
+  fun addMarketItem(
+    list: MarketList,
+    name: String,
+    quantity: String,
+    estimatedPrice: Double,
+    note: String = "",
+  ) {
+    viewModelScope.launch {
+      marketRepository.addMarketItem(
+        list = list,
+        addedByEmail = currentUserEmail,
+        name = name,
+        quantity = quantity,
+        estimatedPrice = estimatedPrice,
+        note = note,
+      ).onFailure { err -> _messages.tryEmit(err.localizedMessage ?: "Failed to add item") }
+    }
+  }
+
+  fun updateMarketItem(
+    listId: String,
+    item: MarketListItem,
+    name: String,
+    quantity: String,
+    estimatedPrice: Double,
+    bought: Boolean,
+    note: String = item.note,
+  ) {
+    viewModelScope.launch {
+      marketRepository.updateMarketItem(
+        listId = listId,
+        itemId = item.id,
+        name = name,
+        quantity = quantity,
+        estimatedPrice = estimatedPrice,
+        bought = bought,
+        note = note,
+      ).onFailure { err -> _messages.tryEmit(err.localizedMessage ?: "Failed to update item") }
+    }
+  }
+
+  fun toggleMarketItemBought(listId: String, item: MarketListItem) {
+    updateMarketItem(
+      listId = listId,
+      item = item,
+      name = item.name,
+      quantity = item.quantity,
+      estimatedPrice = item.estimatedPrice,
+      bought = !item.bought,
+      note = item.note,
+    )
+  }
+
+  fun deleteMarketItem(listId: String, itemId: String) {
+    viewModelScope.launch {
+      marketRepository.deleteMarketItem(listId, itemId)
+        .onFailure { err -> _messages.tryEmit(err.localizedMessage ?: "Failed to delete item") }
+    }
+  }
+
+  fun logMarketListAsExpense(
+    list: MarketList,
+    totalAmount: Double,
+    paymentMethod: PaymentMethod,
+    markCompleted: Boolean = true,
+  ) {
+    val strings = stringsFor(settings.value.language)
+    val itemsSummary = selectedMarketItems.value
+      .filter { it.bought }
+      .take(6)
+      .joinToString(", ") { it.name }
+    viewModelScope.launch {
+      val expRes = repository.addExpense(
+        userId = currentUserId,
+        title = list.title,
+        amount = totalAmount,
+        categoryId = "groceries",
+        paymentMethod = paymentMethod,
+        note = itemsSummary,
+        dateMillis = System.currentTimeMillis(),
+      )
+      expRes.onSuccess {
+        if (markCompleted && !list.completed) {
+          marketRepository.toggleMarketListCompleted(list.id, true)
+        }
+        _messages.tryEmit(strings.marketExpenseSaved)
+      }.onFailure { err ->
+        _messages.tryEmit(err.localizedMessage ?: "Failed to save bazaar expense")
+      }
+    }
+  }
+
   fun addCustomCategory(name: String, iconKey: String, colorHex: Long) {
     viewModelScope.launch {
       repository.addCustomCategory(currentUserId, name, iconKey, colorHex)
@@ -650,6 +979,8 @@ class HisabViewModel(
       transfers = data?.transfers.orEmpty(),
       payables = data?.payables.orEmpty(),
       payablePayments = data?.payablePayments.orEmpty(),
+      receivables = data?.receivables.orEmpty(),
+      receivablePayments = data?.receivablePayments.orEmpty(),
     )
   }
 
@@ -669,6 +1000,8 @@ class HisabViewModel(
       transfers = data?.transfers.orEmpty(),
       payables = data?.payables.orEmpty(),
       payablePayments = data?.payablePayments.orEmpty(),
+      receivables = data?.receivables.orEmpty(),
+      receivablePayments = data?.receivablePayments.orEmpty(),
     )
   }
 
@@ -691,6 +1024,8 @@ class HisabViewModel(
           transfers = parsed.transfers,
           payables = parsed.payables,
           payablePayments = parsed.payablePayments,
+          receivables = parsed.receivables,
+          receivablePayments = parsed.receivablePayments,
         )
         res.onSuccess {
           _messages.tryEmit(stringsFor(settings.value.language).importSuccess)
@@ -759,6 +1094,8 @@ class HisabViewModel(
             transfers = parsed.transfers,
             payables = parsed.payables,
             payablePayments = parsed.payablePayments,
+            receivables = parsed.receivables,
+            receivablePayments = parsed.receivablePayments,
           )
           res.onSuccess {
             _messages.tryEmit(stringsFor(settings.value.language).driveRestoreSuccess)

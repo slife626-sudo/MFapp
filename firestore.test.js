@@ -425,3 +425,197 @@ test("Owner can create, update, delete transfers, payables, and payablePayments;
   await assertSucceeds(payRef.delete());
   await assertSucceeds(trRef.delete());
 });
+
+test("Owner can create, update, delete receivables and receivablePayments; rejects invalid and cross-user writes", async () => {
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+  const unauthDb = testEnv.unauthenticatedContext().firestore();
+  const created = new Date(Date.now() - 10000);
+
+  await assertFails(unauthDb.collection("users").doc(ALICE_UID).collection("receivables").get());
+  await assertFails(unauthDb.collection("users").doc(ALICE_UID).collection("receivablePayments").get());
+
+  // Valid Receivable (money lent out from BANK)
+  const recRef = aliceDb.collection("users").doc(ALICE_UID).collection("receivables").doc("rec_1");
+  await assertSucceeds(
+    recRef.set({
+      userId: ALICE_UID,
+      personName: "Rahim",
+      amount: 5000,
+      collectedAmount: 0,
+      paymentMethod: "BANK",
+      note: "Short term loan",
+      dateMillis: Date.now() - 5000,
+      monthKey: "2026-11",
+      settled: false,
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+
+  // Valid ReceivablePayment (partial collection into CASH)
+  const colRef = aliceDb.collection("users").doc(ALICE_UID).collection("receivablePayments").doc("col_1");
+  await assertSucceeds(
+    colRef.set({
+      userId: ALICE_UID,
+      receivableId: "rec_1",
+      personName: "Rahim",
+      amount: 2000,
+      paymentMethod: "CASH",
+      note: "Returned half",
+      dateMillis: Date.now() - 2000,
+      monthKey: "2026-11",
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+
+  await assertSucceeds(
+    recRef.update({
+      collectedAmount: 2000,
+      settled: false,
+      updatedAt: new Date(Date.now() - 1000),
+    })
+  );
+
+  // Cross-user isolation
+  await assertFails(bobDb.collection("users").doc(ALICE_UID).collection("receivables").get());
+  await assertFails(bobDb.collection("users").doc(ALICE_UID).collection("receivablePayments").get());
+  await assertFails(bobDb.collection("users").doc(ALICE_UID).collection("receivables").doc("rec_1").delete());
+
+  // Owner deletes succeed
+  await assertSucceeds(colRef.delete());
+  await assertSucceeds(recRef.delete());
+});
+
+test("Email-shared MarketList & items: owner creates and shares with spouse email; spouse reads & checks off items; strangers and unverified emails denied", async () => {
+  const wifeDb = testEnv.authenticatedContext("wife_uid", {
+    email: "Wife@Example.com",
+    email_verified: true,
+  }).firestore();
+  const husbandDb = testEnv.authenticatedContext("husband_uid", {
+    email: "husband@example.com",
+    email_verified: true,
+  }).firestore();
+  const unverifiedHusbandDb = testEnv.authenticatedContext("spoof_uid", {
+    email: "husband@example.com",
+    email_verified: false,
+  }).firestore();
+  const strangerDb = testEnv.authenticatedContext("stranger_uid", {
+    email: "stranger@example.com",
+    email_verified: true,
+  }).firestore();
+
+  const created = new Date(Date.now() - 10000);
+  const listRef = wifeDb.collection("marketLists").doc("list_friday");
+
+  // Unverified email cannot create
+  await assertFails(
+    unverifiedHusbandDb.collection("marketLists").doc("list_bad").set({
+      ownerUid: "spoof_uid",
+      ownerEmail: "husband@example.com",
+      ownerName: "Spoof",
+      title: "Fake List",
+      sharedWithEmail: "",
+      memberEmails: ["husband@example.com"],
+      note: "",
+      completed: false,
+      dateMillis: Date.now(),
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+
+  // Wife creates market list shared with husband@example.com
+  await assertSucceeds(
+    listRef.set({
+      ownerUid: "wife_uid",
+      ownerEmail: "wife@example.com",
+      ownerName: "Ayesha",
+      title: "Friday Bazaar",
+      sharedWithEmail: "husband@example.com",
+      memberEmails: ["wife@example.com", "husband@example.com"],
+      note: "Buy fresh fish",
+      completed: false,
+      dateMillis: Date.now() - 5000,
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+
+  // Wife adds item to the market list
+  const itemRef = listRef.collection("items").doc("item_rice");
+  await assertSucceeds(
+    itemRef.set({
+      listId: "list_friday",
+      ownerUid: "wife_uid",
+      memberEmails: ["wife@example.com", "husband@example.com"],
+      addedByEmail: "wife@example.com",
+      name: "Miniket Rice",
+      quantity: "5 kg",
+      estimatedPrice: 380,
+      bought: false,
+      note: "",
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+
+  // Unfiltered list query denied even for members
+  await assertFails(husbandDb.collection("marketLists").get());
+
+  // Query filtered by memberEmails succeeds for husband & wife
+  await assertSucceeds(
+    husbandDb.collection("marketLists").where("memberEmails", "array-contains", "husband@example.com").get()
+  );
+  await assertSucceeds(
+    husbandDb.collection("marketLists").doc("list_friday").collection("items")
+      .where("memberEmails", "array-contains", "husband@example.com").get()
+  );
+
+  // Spoofed unverified email denied read
+  await assertFails(
+    unverifiedHusbandDb.collection("marketLists").doc("list_friday").get()
+  );
+
+  // Stranger denied read, write, and delete
+  await assertFails(strangerDb.collection("marketLists").doc("list_friday").get());
+  await assertFails(
+    strangerDb.collection("marketLists").where("memberEmails", "array-contains", "husband@example.com").get()
+  );
+  await assertFails(
+    strangerDb.collection("marketLists").doc("list_friday").collection("items").doc("item_rice").update({
+      bought: true,
+      updatedAt: new Date(Date.now() - 1000),
+    })
+  );
+
+  // Husband marks item as bought with actual price & completes list
+  await assertSucceeds(
+    husbandDb.collection("marketLists").doc("list_friday").collection("items").doc("item_rice").update({
+      bought: true,
+      estimatedPrice: 390,
+      updatedAt: new Date(Date.now() - 1000),
+    })
+  );
+  await assertSucceeds(
+    husbandDb.collection("marketLists").doc("list_friday").update({
+      completed: true,
+      updatedAt: new Date(Date.now() - 1000),
+    })
+  );
+
+  // Husband (non-owner) cannot hijack ownerEmail or delete owner's list
+  await assertFails(husbandDb.collection("marketLists").doc("list_friday").delete());
+  await assertFails(
+    husbandDb.collection("marketLists").doc("list_friday").update({
+      title: "Hijacked",
+      updatedAt: new Date(Date.now() - 500),
+    })
+  );
+
+  // Owner (wife) can delete item & list
+  await assertSucceeds(itemRef.delete());
+  await assertSucceeds(listRef.delete());
+});
+

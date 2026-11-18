@@ -13,6 +13,8 @@ import com.example.data.model.MonthlyBudget
 import com.example.data.model.Payable
 import com.example.data.model.PayablePayment
 import com.example.data.model.PaymentMethod
+import com.example.data.model.Receivable
+import com.example.data.model.ReceivablePayment
 import com.google.firebase.Firebase
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
@@ -170,6 +172,62 @@ class ExpenseRepository(
       .map { snapshot ->
         val list = snapshot.toObjects(
           PayablePayment::class.java,
+          DocumentSnapshot.ServerTimestampBehavior.ESTIMATE,
+        ).sortedByDescending { it.dateMillis }
+        SyncSnapshot(
+          items = list,
+          hasPendingWrites = snapshot.metadata.hasPendingWrites(),
+          isFromCache = snapshot.metadata.isFromCache,
+        )
+      }
+      .catch { error ->
+        val firestoreError = generateSequence(error) { it.cause }
+          .filterIsInstance<FirebaseFirestoreException>()
+          .firstOrNull()
+        if (firestoreError == null && error is CancellationException) throw error
+        val exceptionToLog = firestoreError ?: (error as? Exception)
+        if (exceptionToLog != null && auth.currentUser?.uid == userId) {
+          handleFirestoreError(exceptionToLog, OperationType.LIST, path)
+        }
+        throw error
+      }
+  }
+
+  fun observeReceivables(userId: String): Flow<SyncSnapshot<Receivable>> {
+    val path = "users/$userId/receivables"
+    return db.collection("users").document(userId).collection("receivables")
+      .snapshots(MetadataChanges.INCLUDE)
+      .map { snapshot ->
+        val list = snapshot.toObjects(
+          Receivable::class.java,
+          DocumentSnapshot.ServerTimestampBehavior.ESTIMATE,
+        ).sortedByDescending { it.dateMillis }
+        SyncSnapshot(
+          items = list,
+          hasPendingWrites = snapshot.metadata.hasPendingWrites(),
+          isFromCache = snapshot.metadata.isFromCache,
+        )
+      }
+      .catch { error ->
+        val firestoreError = generateSequence(error) { it.cause }
+          .filterIsInstance<FirebaseFirestoreException>()
+          .firstOrNull()
+        if (firestoreError == null && error is CancellationException) throw error
+        val exceptionToLog = firestoreError ?: (error as? Exception)
+        if (exceptionToLog != null && auth.currentUser?.uid == userId) {
+          handleFirestoreError(exceptionToLog, OperationType.LIST, path)
+        }
+        throw error
+      }
+  }
+
+  fun observeReceivablePayments(userId: String): Flow<SyncSnapshot<ReceivablePayment>> {
+    val path = "users/$userId/receivablePayments"
+    return db.collection("users").document(userId).collection("receivablePayments")
+      .snapshots(MetadataChanges.INCLUDE)
+      .map { snapshot ->
+        val list = snapshot.toObjects(
+          ReceivablePayment::class.java,
           DocumentSnapshot.ServerTimestampBehavior.ESTIMATE,
         ).sortedByDescending { it.dateMillis }
         SyncSnapshot(
@@ -741,6 +799,211 @@ class ExpenseRepository(
     }
   }
 
+  suspend fun addReceivable(
+    userId: String,
+    personName: String,
+    amount: Double,
+    paymentMethod: PaymentMethod,
+    note: String,
+    dateMillis: Long,
+  ): Result<Unit> {
+    var docPath = "users/$userId/receivables"
+    return try {
+      val uid = requireMatchingUserId(userId)
+      val cleanName = personName.trim().take(120)
+      val cleanNote = note.trim().take(300)
+      val validDateMillis = if (dateMillis > 0L) dateMillis else System.currentTimeMillis()
+      val monthKey = DateFormatUtils.monthKeyFromMillis(validDateMillis)
+      require(cleanName.isNotEmpty()) { "Person name cannot be empty" }
+      require(amount > 0.0 && amount <= 1_000_000_000.0) { "Amount out of valid range" }
+
+      val docRef = db.collection("users").document(uid).collection("receivables").document()
+      docPath = docRef.path
+      val payload = mapOf(
+        "userId" to uid,
+        "personName" to cleanName,
+        "amount" to amount,
+        "collectedAmount" to 0.0,
+        "paymentMethod" to paymentMethod.wireValue,
+        "note" to cleanNote,
+        "dateMillis" to validDateMillis,
+        "monthKey" to monthKey,
+        "settled" to false,
+        "createdAt" to FieldValue.serverTimestamp(),
+        "updatedAt" to FieldValue.serverTimestamp(),
+      )
+      docRef.set(payload).await()
+      Result.success(Unit)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      handleFirestoreError(e, OperationType.CREATE, docPath)
+      Result.failure(e)
+    }
+  }
+
+  suspend fun updateReceivable(
+    userId: String,
+    receivable: Receivable,
+    personName: String,
+    amount: Double,
+    paymentMethod: PaymentMethod,
+    note: String,
+    dateMillis: Long,
+  ): Result<Unit> {
+    val docPath = "users/$userId/receivables/${receivable.id}"
+    return try {
+      val uid = requireMatchingUserId(userId)
+      require(receivable.id.isNotBlank()) { "Receivable ID required" }
+      val cleanName = personName.trim().take(120)
+      val cleanNote = note.trim().take(300)
+      val validDateMillis = if (dateMillis > 0L) dateMillis else System.currentTimeMillis()
+      val monthKey = DateFormatUtils.monthKeyFromMillis(validDateMillis)
+      require(cleanName.isNotEmpty()) { "Person name cannot be empty" }
+      require(amount > 0.0 && amount <= 1_000_000_000.0) { "Amount out of valid range" }
+      val clampedCollected = receivable.collectedAmount.coerceIn(0.0, 1_000_000_000.0)
+      val isSettledNow = clampedCollected + 0.001 >= amount
+
+      db.collection("users").document(uid).collection("receivables").document(receivable.id)
+        .update(
+          mapOf(
+            "personName" to cleanName,
+            "amount" to amount,
+            "collectedAmount" to clampedCollected,
+            "paymentMethod" to paymentMethod.wireValue,
+            "note" to cleanNote,
+            "dateMillis" to validDateMillis,
+            "monthKey" to monthKey,
+            "settled" to isSettledNow,
+            "updatedAt" to FieldValue.serverTimestamp(),
+          )
+        ).await()
+      Result.success(Unit)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      handleFirestoreError(e, OperationType.UPDATE, docPath)
+      Result.failure(e)
+    }
+  }
+
+  suspend fun deleteReceivable(
+    userId: String,
+    receivableId: String,
+    relatedPaymentIds: List<String>,
+  ): Result<Unit> {
+    val docPath = "users/$userId/receivables/$receivableId"
+    return try {
+      val uid = requireMatchingUserId(userId)
+      require(receivableId.isNotBlank()) { "Receivable ID required" }
+      val batch = db.batch()
+      batch.delete(db.collection("users").document(uid).collection("receivables").document(receivableId))
+      for (payId in relatedPaymentIds) {
+        if (payId.isNotBlank()) {
+          batch.delete(db.collection("users").document(uid).collection("receivablePayments").document(payId))
+        }
+      }
+      batch.commit().await()
+      Result.success(Unit)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      handleFirestoreError(e, OperationType.DELETE, docPath)
+      Result.failure(e)
+    }
+  }
+
+  suspend fun addReceivablePayment(
+    userId: String,
+    receivable: Receivable,
+    amount: Double,
+    paymentMethod: PaymentMethod,
+    note: String,
+    dateMillis: Long,
+    currentCollectedSum: Double,
+  ): Result<Unit> {
+    val docPath = "users/$userId/receivablePayments"
+    return try {
+      val uid = requireMatchingUserId(userId)
+      require(receivable.id.isNotBlank()) { "Receivable ID required" }
+      val cleanNote = note.trim().take(300)
+      val validDateMillis = if (dateMillis > 0L) dateMillis else System.currentTimeMillis()
+      val monthKey = DateFormatUtils.monthKeyFromMillis(validDateMillis)
+      require(amount > 0.0 && amount <= 1_000_000_000.0) { "Amount out of valid range" }
+
+      val newCollected = (currentCollectedSum + amount).coerceIn(0.0, 1_000_000_000.0)
+      val isSettledNow = newCollected + 0.001 >= receivable.amount
+
+      val batch = db.batch()
+      val paymentRef = db.collection("users").document(uid).collection("receivablePayments").document()
+      batch.set(
+        paymentRef,
+        mapOf(
+          "userId" to uid,
+          "receivableId" to receivable.id,
+          "personName" to receivable.personName.trim().take(120).ifEmpty { "Borrower" },
+          "amount" to amount,
+          "paymentMethod" to paymentMethod.wireValue,
+          "note" to cleanNote,
+          "dateMillis" to validDateMillis,
+          "monthKey" to monthKey,
+          "createdAt" to FieldValue.serverTimestamp(),
+          "updatedAt" to FieldValue.serverTimestamp(),
+        ),
+      )
+      val receivableRef = db.collection("users").document(uid).collection("receivables").document(receivable.id)
+      batch.update(
+        receivableRef,
+        mapOf(
+          "collectedAmount" to newCollected,
+          "settled" to isSettledNow,
+          "updatedAt" to FieldValue.serverTimestamp(),
+        ),
+      )
+      batch.commit().await()
+      Result.success(Unit)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      handleFirestoreError(e, OperationType.CREATE, docPath)
+      Result.failure(e)
+    }
+  }
+
+  suspend fun deleteReceivablePayment(
+    userId: String,
+    payment: ReceivablePayment,
+    parentReceivable: Receivable?,
+    newCollectedSumAfterDelete: Double,
+  ): Result<Unit> {
+    val docPath = "users/$userId/receivablePayments/${payment.id}"
+    return try {
+      val uid = requireMatchingUserId(userId)
+      require(payment.id.isNotBlank()) { "Payment ID required" }
+      val batch = db.batch()
+      batch.delete(db.collection("users").document(uid).collection("receivablePayments").document(payment.id))
+      if (parentReceivable != null && parentReceivable.id.isNotBlank()) {
+        val safeCollected = newCollectedSumAfterDelete.coerceIn(0.0, 1_000_000_000.0)
+        val isSettledNow = safeCollected + 0.001 >= parentReceivable.amount
+        batch.update(
+          db.collection("users").document(uid).collection("receivables").document(parentReceivable.id),
+          mapOf(
+            "collectedAmount" to safeCollected,
+            "settled" to isSettledNow,
+            "updatedAt" to FieldValue.serverTimestamp(),
+          ),
+        )
+      }
+      batch.commit().await()
+      Result.success(Unit)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      handleFirestoreError(e, OperationType.DELETE, docPath)
+      Result.failure(e)
+    }
+  }
+
   suspend fun addCustomCategory(
     userId: String,
     name: String,
@@ -867,6 +1130,8 @@ class ExpenseRepository(
     transfers: List<AccountTransfer> = emptyList(),
     payables: List<Payable> = emptyList(),
     payablePayments: List<PayablePayment> = emptyList(),
+    receivables: List<Receivable> = emptyList(),
+    receivablePayments: List<ReceivablePayment> = emptyList(),
   ): Result<Int> {
     return try {
       val uid = requireMatchingUserId(userId)
@@ -1027,6 +1292,58 @@ class ExpenseRepository(
           mapOf(
             "userId" to uid,
             "payableId" to safePayableId,
+            "personName" to safeName,
+            "amount" to pmt.amount.coerceIn(0.01, 1_000_000_000.0),
+            "paymentMethod" to PaymentMethod.fromWire(pmt.paymentMethod).wireValue,
+            "note" to pmt.note.trim().take(300),
+            "dateMillis" to validDate,
+            "monthKey" to monthKey,
+            "createdAt" to FieldValue.serverTimestamp(),
+            "updatedAt" to FieldValue.serverTimestamp(),
+          )
+        ).await()
+        importedCount++
+      }
+
+      for (rec in receivables) {
+        val safeName = rec.personName.trim().take(120)
+        if (safeName.isEmpty() || rec.amount <= 0.0) continue
+        val validDate = if (rec.dateMillis > 0L) rec.dateMillis else System.currentTimeMillis()
+        val monthKey = DateFormatUtils.monthKeyFromMillis(validDate)
+        val safeId = sanitizeId(rec.id)
+        val colRef = db.collection("users").document(uid).collection("receivables")
+        val docRef = if (safeId.isNotEmpty()) colRef.document(safeId) else colRef.document()
+        docRef.set(
+          mapOf(
+            "userId" to uid,
+            "personName" to safeName,
+            "amount" to rec.amount.coerceIn(0.01, 1_000_000_000.0),
+            "collectedAmount" to rec.collectedAmount.coerceIn(0.0, 1_000_000_000.0),
+            "paymentMethod" to PaymentMethod.fromWire(rec.paymentMethod).wireValue,
+            "note" to rec.note.trim().take(300),
+            "dateMillis" to validDate,
+            "monthKey" to monthKey,
+            "settled" to rec.settled,
+            "createdAt" to FieldValue.serverTimestamp(),
+            "updatedAt" to FieldValue.serverTimestamp(),
+          )
+        ).await()
+        importedCount++
+      }
+
+      for (pmt in receivablePayments) {
+        val safeName = pmt.personName.trim().take(120)
+        val safeReceivableId = sanitizeId(pmt.receivableId)
+        if (safeName.isEmpty() || safeReceivableId.isEmpty() || pmt.amount <= 0.0) continue
+        val validDate = if (pmt.dateMillis > 0L) pmt.dateMillis else System.currentTimeMillis()
+        val monthKey = DateFormatUtils.monthKeyFromMillis(validDate)
+        val safeId = sanitizeId(pmt.id)
+        val colRef = db.collection("users").document(uid).collection("receivablePayments")
+        val docRef = if (safeId.isNotEmpty()) colRef.document(safeId) else colRef.document()
+        docRef.set(
+          mapOf(
+            "userId" to uid,
+            "receivableId" to safeReceivableId,
             "personName" to safeName,
             "amount" to pmt.amount.coerceIn(0.01, 1_000_000_000.0),
             "paymentMethod" to PaymentMethod.fromWire(pmt.paymentMethod).wireValue,

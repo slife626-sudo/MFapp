@@ -19,12 +19,14 @@ import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -72,20 +74,24 @@ import com.example.data.model.CurrencyOption
 import com.example.data.model.Expense
 import com.example.data.model.Income
 import com.example.data.model.Payable
+import com.example.data.model.Receivable
 import com.example.data.model.UiState
 import com.example.data.prefs.UserPreferencesRepository
 import com.example.data.prefs.UserSettings
 import com.example.data.repository.ExpenseRepository
+import com.example.data.repository.MarketListRepository
 import com.example.i18n.LocalStrings
 import com.example.i18n.stringsFor
 import com.example.ui.auth.AuthScreen
 import com.example.ui.auth.signOutUser
 import com.example.ui.components.AddEditExpenseSheet
+import com.example.ui.components.CollectReceivableDialog
 import com.example.ui.components.EntrySheetMode
 import com.example.ui.components.PinLockOverlay
 import com.example.ui.components.RepayPayableDialog
 import com.example.ui.screens.BudgetsScreen
 import com.example.ui.screens.DashboardScreen
+import com.example.ui.screens.MarketScreen
 import com.example.ui.screens.ReportsScreen
 import com.example.ui.screens.SettingsScreen
 import com.example.ui.screens.WalletsScreen
@@ -104,6 +110,7 @@ import kotlinx.coroutines.launch
 
 const val ROUTE_DASHBOARD = "dashboard"
 const val ROUTE_WALLETS = "wallets"
+const val ROUTE_MARKET = "market"
 const val ROUTE_REPORTS = "reports"
 const val ROUTE_BUDGETS = "budgets"
 const val ROUTE_SETTINGS = "settings"
@@ -195,12 +202,16 @@ private fun AuthenticatedHisabApp(
         val databaseId = app.getString(R.string.firestore_database_id)
         val db = FirebaseFirestore.getInstance(databaseId)
         val repository = ExpenseRepository(db)
+        val marketRepository = MarketListRepository(db)
         val prefsRepo = UserPreferencesRepository(app.applicationContext)
         HisabViewModel(
           repository = repository,
+          marketRepository = marketRepository,
           prefsRepo = prefsRepo,
           appContext = app.applicationContext,
           currentUserId = currentUser.uid,
+          currentUserEmail = currentUser.email.orEmpty(),
+          currentUserName = currentUser.displayName.orEmpty(),
         )
       }
     },
@@ -225,6 +236,9 @@ private fun AuthenticatedHisabApp(
   val isLocked by viewModel.isLocked.collectAsStateWithLifecycle()
   val isBusy by viewModel.isBusy.collectAsStateWithLifecycle()
   val driveFiles by viewModel.driveFiles.collectAsStateWithLifecycle()
+  val marketLists by viewModel.marketLists.collectAsStateWithLifecycle()
+  val selectedMarketListId by viewModel.selectedMarketListId.collectAsStateWithLifecycle()
+  val selectedMarketItems by viewModel.selectedMarketItems.collectAsStateWithLifecycle()
 
   val snackbarHostState = remember { SnackbarHostState() }
   LaunchedEffect(viewModel) {
@@ -242,14 +256,17 @@ private fun AuthenticatedHisabApp(
   var editingIncome by remember { mutableStateOf<Income?>(null) }
   var editingTransfer by remember { mutableStateOf<AccountTransfer?>(null) }
   var editingPayable by remember { mutableStateOf<Payable?>(null) }
+  var editingReceivable by remember { mutableStateOf<Receivable?>(null) }
   var sheetInitialMode by remember { mutableStateOf(EntrySheetMode.EXPENSE) }
   var repayingPayable by remember { mutableStateOf<Payable?>(null) }
+  var collectingReceivable by remember { mutableStateOf<Receivable?>(null) }
 
   fun openNewSheet(mode: EntrySheetMode) {
     editingExpense = null
     editingIncome = null
     editingTransfer = null
     editingPayable = null
+    editingReceivable = null
     sheetInitialMode = mode
     showExpenseSheet = true
   }
@@ -260,6 +277,7 @@ private fun AuthenticatedHisabApp(
     editingIncome = null
     editingTransfer = null
     editingPayable = null
+    editingReceivable = null
     sheetInitialMode = EntrySheetMode.EXPENSE
   }
 
@@ -361,6 +379,18 @@ private fun AuthenticatedHisabApp(
                   modifier = Modifier.testTag("rail_${dest.route}"),
                 )
               }
+              NavigationRailItem(
+                selected = currentRoute == ROUTE_MARKET,
+                onClick = { navigateTo(ROUTE_MARKET) },
+                icon = {
+                  Icon(
+                    imageVector = if (currentRoute == ROUTE_MARKET) Icons.Rounded.ShoppingBag else Icons.Outlined.ShoppingBag,
+                    contentDescription = strings.marketListTitle,
+                  )
+                },
+                label = { Text(strings.marketListTitle) },
+                modifier = Modifier.testTag("rail_$ROUTE_MARKET"),
+              )
             }
           }
 
@@ -417,6 +447,18 @@ private fun AuthenticatedHisabApp(
                   onDeletePayable = { pay -> viewModel.deletePayable(pay.id) },
                   onRepayPayable = { pay -> repayingPayable = pay },
                   onDeleteRepayment = { pmt -> viewModel.deletePayablePayment(pmt) },
+                  marketLists = marketLists,
+                  currentUserId = currentUser.uid,
+                  onOpenMarket = { navigateTo(ROUTE_MARKET) },
+                  onOpenLend = { openNewSheet(EntrySheetMode.LEND) },
+                  onEditReceivable = { rec ->
+                    closeSheet()
+                    editingReceivable = rec
+                    showExpenseSheet = true
+                  },
+                  onDeleteReceivable = { rec -> viewModel.deleteReceivable(rec.id) },
+                  onCollectReceivable = { rec -> collectingReceivable = rec },
+                  onDeleteCollection = { col -> viewModel.deleteReceivablePayment(col) },
                 )
               }
 
@@ -441,6 +483,37 @@ private fun AuthenticatedHisabApp(
                   onDeletePayable = { pay -> viewModel.deletePayable(pay.id) },
                   onRepayPayable = { pay -> repayingPayable = pay },
                   onDeleteRepayment = { pmt -> viewModel.deletePayablePayment(pmt) },
+                  onOpenLend = { openNewSheet(EntrySheetMode.LEND) },
+                  onEditReceivable = { rec ->
+                    closeSheet()
+                    editingReceivable = rec
+                    showExpenseSheet = true
+                  },
+                  onDeleteReceivable = { rec -> viewModel.deleteReceivable(rec.id) },
+                  onCollectReceivable = { rec -> collectingReceivable = rec },
+                  onDeleteCollection = { col -> viewModel.deleteReceivablePayment(col) },
+                )
+              }
+
+              composable(ROUTE_MARKET) {
+                MarketScreen(
+                  marketLists = marketLists,
+                  selectedListId = selectedMarketListId,
+                  selectedItems = selectedMarketItems,
+                  currentUserId = currentUser.uid,
+                  accountBalances = accountBalances,
+                  settings = settings,
+                  onBackToDashboard = { navController.popBackStack() },
+                  onSelectList = viewModel::selectMarketList,
+                  onCreateList = viewModel::createMarketList,
+                  onUpdateListAndShare = viewModel::updateMarketListAndShare,
+                  onToggleListCompleted = viewModel::toggleMarketListCompleted,
+                  onDeleteList = viewModel::deleteMarketList,
+                  onAddItem = viewModel::addMarketItem,
+                  onUpdateItem = viewModel::updateMarketItem,
+                  onToggleItemBought = viewModel::toggleMarketItemBought,
+                  onDeleteItem = viewModel::deleteMarketItem,
+                  onLogAsExpense = viewModel::logMarketListAsExpense,
                 )
               }
 
@@ -509,6 +582,7 @@ private fun AuthenticatedHisabApp(
         initialIncome = editingIncome,
         initialTransfer = editingTransfer,
         initialPayable = editingPayable,
+        initialReceivable = editingReceivable,
         initialMode = sheetInitialMode,
         accountBalances = accountBalances,
         categories = categories,
@@ -551,6 +625,15 @@ private fun AuthenticatedHisabApp(
           }
           closeSheet()
         },
+        onSaveReceivable = { personName, amount, method, note, dateMillis ->
+          val existing = editingReceivable
+          if (existing == null) {
+            viewModel.addReceivable(personName, amount, method, note, dateMillis)
+          } else {
+            viewModel.updateReceivable(existing, personName, amount, method, note, dateMillis)
+          }
+          closeSheet()
+        },
         onCreateCustomCategory = viewModel::addCustomCategory,
       )
     }
@@ -568,6 +651,24 @@ private fun AuthenticatedHisabApp(
         onConfirm = { amount, method, note, dateMillis ->
           viewModel.repayPayable(activePayableToRepay, amount, method, note, dateMillis)
           repayingPayable = null
+        },
+      )
+    }
+
+    val activeReceivableToCollect = collectingReceivable
+    if (activeReceivableToCollect != null) {
+      val collectedAlready = successData?.collectedAmountForReceivable(activeReceivableToCollect)
+        ?: activeReceivableToCollect.collectedAmount
+      CollectReceivableDialog(
+        receivable = activeReceivableToCollect,
+        collectedAlready = collectedAlready,
+        accountBalances = accountBalances,
+        currencySymbol = currencySymbol,
+        langCode = settings.language.code,
+        onDismiss = { collectingReceivable = null },
+        onConfirm = { amount, method, note, dateMillis ->
+          viewModel.collectReceivable(activeReceivableToCollect, amount, method, note, dateMillis)
+          collectingReceivable = null
         },
       )
     }

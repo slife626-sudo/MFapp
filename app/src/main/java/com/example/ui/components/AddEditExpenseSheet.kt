@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Handshake
+import androidx.compose.material.icons.rounded.NorthEast
 import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.SwapVert
@@ -71,6 +72,7 @@ import com.example.data.model.Expense
 import com.example.data.model.Income
 import com.example.data.model.Payable
 import com.example.data.model.PaymentMethod
+import com.example.data.model.Receivable
 import com.example.i18n.AppStrings
 import com.example.i18n.LocalStrings
 import com.example.ui.theme.HisabMonoFontFamily
@@ -81,6 +83,7 @@ enum class EntrySheetMode {
   INCOME,
   TRANSFER,
   BORROW,
+  LEND,
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -103,6 +106,7 @@ fun AddEditExpenseSheet(
   initialIncome: Income? = null,
   initialTransfer: AccountTransfer? = null,
   initialPayable: Payable? = null,
+  initialReceivable: Receivable? = null,
   initialMode: EntrySheetMode = EntrySheetMode.EXPENSE,
   accountBalances: AccountBalances = AccountBalances(),
   onSaveIncome: (
@@ -126,6 +130,13 @@ fun AddEditExpenseSheet(
     note: String,
     dateMillis: Long,
   ) -> Unit = { _, _, _, _, _ -> },
+  onSaveReceivable: (
+    personName: String,
+    amount: Double,
+    paymentMethod: PaymentMethod,
+    note: String,
+    dateMillis: Long,
+  ) -> Unit = { _, _, _, _, _ -> },
 ) {
   val strings = LocalStrings.current
   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -133,12 +144,14 @@ fun AddEditExpenseSheet(
   val isCreatingNew = initialExpense == null &&
     initialIncome == null &&
     initialTransfer == null &&
-    initialPayable == null
+    initialPayable == null &&
+    initialReceivable == null
 
-  var mode by remember(initialExpense, initialIncome, initialTransfer, initialPayable, initialMode) {
+  var mode by remember(initialExpense, initialIncome, initialTransfer, initialPayable, initialReceivable, initialMode) {
     mutableStateOf(
       when {
         initialTransfer != null -> EntrySheetMode.TRANSFER
+        initialReceivable != null -> EntrySheetMode.LEND
         initialPayable != null -> EntrySheetMode.BORROW
         initialIncome != null -> EntrySheetMode.INCOME
         initialExpense != null -> EntrySheetMode.EXPENSE
@@ -147,19 +160,21 @@ fun AddEditExpenseSheet(
     )
   }
 
-  var title by remember(initialExpense, initialIncome, initialPayable) {
+  var title by remember(initialExpense, initialIncome, initialPayable, initialReceivable) {
     mutableStateOf(
       initialExpense?.title
         ?: initialIncome?.title
         ?: initialPayable?.personName
+        ?: initialReceivable?.personName
         ?: ""
     )
   }
-  var amountText by remember(initialExpense, initialIncome, initialTransfer, initialPayable) {
+  var amountText by remember(initialExpense, initialIncome, initialTransfer, initialPayable, initialReceivable) {
     val existingAmount = initialExpense?.amount
       ?: initialIncome?.amount
       ?: initialTransfer?.amount
       ?: initialPayable?.amount
+      ?: initialReceivable?.amount
       ?: 0.0
     mutableStateOf(
       if (existingAmount > 0.0) {
@@ -171,12 +186,13 @@ fun AddEditExpenseSheet(
   var selectedCategoryId by remember(initialExpense) {
     mutableStateOf(initialExpense?.categoryId ?: categories.firstOrNull()?.id ?: "food")
   }
-  var selectedMethod by remember(initialExpense, initialIncome, initialPayable) {
+  var selectedMethod by remember(initialExpense, initialIncome, initialPayable, initialReceivable) {
     mutableStateOf(
       PaymentMethod.fromWire(
         initialExpense?.paymentMethod
           ?: initialIncome?.paymentMethod
           ?: initialPayable?.paymentMethod
+          ?: initialReceivable?.paymentMethod
       )
     )
   }
@@ -192,21 +208,23 @@ fun AddEditExpenseSheet(
       else PaymentMethod.CASH
     )
   }
-  var note by remember(initialExpense, initialIncome, initialTransfer, initialPayable) {
+  var note by remember(initialExpense, initialIncome, initialTransfer, initialPayable, initialReceivable) {
     mutableStateOf(
       initialExpense?.note
         ?: initialIncome?.note
         ?: initialTransfer?.note
         ?: initialPayable?.note
+        ?: initialReceivable?.note
         ?: ""
     )
   }
-  var dateMillis by remember(initialExpense, initialIncome, initialTransfer, initialPayable) {
+  var dateMillis by remember(initialExpense, initialIncome, initialTransfer, initialPayable, initialReceivable) {
     mutableLongStateOf(
       initialExpense?.dateMillis
         ?: initialIncome?.dateMillis
         ?: initialTransfer?.dateMillis
         ?: initialPayable?.dateMillis
+        ?: initialReceivable?.dateMillis
         ?: System.currentTimeMillis()
     )
   }
@@ -229,10 +247,12 @@ fun AddEditExpenseSheet(
       Text(
         text = when {
           initialTransfer != null -> strings.editTransfer
+          initialReceivable != null -> strings.editLend
           initialPayable != null -> strings.editBorrow
           initialIncome != null -> strings.editBalance
           initialExpense != null -> strings.editExpense
           mode == EntrySheetMode.TRANSFER -> strings.addTransfer
+          mode == EntrySheetMode.LEND -> strings.addLend
           mode == EntrySheetMode.BORROW -> strings.addBorrow
           mode == EntrySheetMode.INCOME -> strings.addBalance
           else -> strings.addExpense
@@ -274,6 +294,13 @@ fun AddEditExpenseSheet(
             label = strings.borrowTypeTab,
             onClick = { mode = EntrySheetMode.BORROW; validationError = null },
             modifier = Modifier.testTag("mode_borrow_tab"),
+          )
+          ModePill(
+            selected = mode == EntrySheetMode.LEND,
+            icon = Icons.Rounded.NorthEast,
+            label = strings.lendTypeTab,
+            onClick = { mode = EntrySheetMode.LEND; validationError = null },
+            modifier = Modifier.testTag("mode_lend_tab"),
           )
         }
       }
@@ -317,6 +344,7 @@ fun AddEditExpenseSheet(
               when (mode) {
                 EntrySheetMode.INCOME -> strings.balanceTitleLabel
                 EntrySheetMode.BORROW -> strings.lenderNameLabel
+                EntrySheetMode.LEND -> strings.borrowerNameLabel
                 else -> strings.expenseTitleLabel
               }
             )
@@ -328,14 +356,14 @@ fun AddEditExpenseSheet(
         )
       }
 
-      if (mode == EntrySheetMode.BORROW) {
+      if (mode == EntrySheetMode.BORROW || mode == EntrySheetMode.LEND) {
         Surface(
           color = MaterialTheme.colorScheme.secondaryContainer,
           shape = RoundedCornerShape(12.dp),
           modifier = Modifier.fillMaxWidth(),
         ) {
           Text(
-            text = strings.borrowAutoPayableHint,
+            text = if (mode == EntrySheetMode.LEND) strings.lendAutoReceivableHint else strings.borrowAutoPayableHint,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSecondaryContainer,
             modifier = Modifier.padding(12.dp),
@@ -431,7 +459,11 @@ fun AddEditExpenseSheet(
         )
       } else {
         Text(
-          text = if (mode == EntrySheetMode.EXPENSE) strings.paymentMethodLabel else strings.receiveMethodLabel,
+          text = when (mode) {
+            EntrySheetMode.EXPENSE -> strings.paymentMethodLabel
+            EntrySheetMode.LEND -> strings.lendFromAccountLabel
+            else -> strings.receiveMethodLabel
+          },
           style = MaterialTheme.typography.labelLarge,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -504,6 +536,13 @@ fun AddEditExpenseSheet(
                   return@Button
                 }
                 onSavePayable(title.trim(), amount, selectedMethod, note.trim(), dateMillis)
+              }
+              EntrySheetMode.LEND -> {
+                if (title.trim().isEmpty()) {
+                  validationError = strings.invalidInputError
+                  return@Button
+                }
+                onSaveReceivable(title.trim(), amount, selectedMethod, note.trim(), dateMillis)
               }
               EntrySheetMode.INCOME -> {
                 if (title.trim().isEmpty()) {

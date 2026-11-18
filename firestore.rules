@@ -184,6 +184,130 @@ service cloud.firestore {
              data.updatedAt <= request.time;
     }
 
+    function isValidReceivable(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.personName is string &&
+             data.personName.size() >= 1 &&
+             data.personName.size() <= 120 &&
+             data.amount is number &&
+             data.amount > 0 &&
+             data.amount <= 1000000000 &&
+             data.collectedAmount is number &&
+             data.collectedAmount >= 0 &&
+             data.collectedAmount <= 1000000000 &&
+             data.paymentMethod in ['CASH', 'CARD', 'MOBILE', 'BANK'] &&
+             data.note is string &&
+             data.note.size() <= 300 &&
+             data.dateMillis is int &&
+             data.dateMillis > 0 &&
+             isValidMonthKey(data.monthKey) &&
+             data.settled is bool &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    function isValidReceivablePayment(data, userId) {
+      return data.userId is string &&
+             data.userId == userId &&
+             data.userId == request.auth.uid &&
+             data.receivableId is string &&
+             data.receivableId.size() >= 1 &&
+             data.receivableId.size() <= 128 &&
+             data.personName is string &&
+             data.personName.size() >= 1 &&
+             data.personName.size() <= 120 &&
+             data.amount is number &&
+             data.amount > 0 &&
+             data.amount <= 1000000000 &&
+             data.paymentMethod in ['CASH', 'CARD', 'MOBILE', 'BANK'] &&
+             data.note is string &&
+             data.note.size() <= 300 &&
+             data.dateMillis is int &&
+             data.dateMillis > 0 &&
+             isValidMonthKey(data.monthKey) &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    function isVerifiedEmail() {
+      return isSignedIn() &&
+             request.auth.token.email is string &&
+             request.auth.token.email.size() >= 3 &&
+             request.auth.token.email_verified == true;
+    }
+
+    function isMarketMember(data) {
+      return isSignedIn() && (
+        data.ownerUid == request.auth.uid ||
+        (isVerifiedEmail() && request.auth.token.email.lower() in data.memberEmails)
+      );
+    }
+
+    function isValidMarketList(data) {
+      return data.ownerUid is string &&
+             data.ownerUid.size() >= 1 &&
+             data.ownerUid.size() <= 128 &&
+             data.ownerEmail is string &&
+             data.ownerEmail.size() >= 3 &&
+             data.ownerEmail.size() <= 160 &&
+             data.ownerName is string &&
+             data.ownerName.size() <= 80 &&
+             data.title is string &&
+             data.title.size() >= 1 &&
+             data.title.size() <= 120 &&
+             data.sharedWithEmail is string &&
+             data.sharedWithEmail.size() <= 160 &&
+             data.memberEmails is list &&
+             data.memberEmails.size() >= 1 &&
+             data.memberEmails.size() <= 10 &&
+             data.memberEmails[0] is string &&
+             data.ownerEmail in data.memberEmails &&
+             data.note is string &&
+             data.note.size() <= 300 &&
+             data.completed is bool &&
+             data.dateMillis is int &&
+             data.dateMillis > 0 &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
+    function isValidMarketItem(data, listId) {
+      return data.listId is string &&
+             data.listId == listId &&
+             data.ownerUid is string &&
+             data.ownerUid.size() >= 1 &&
+             data.ownerUid.size() <= 128 &&
+             data.memberEmails is list &&
+             data.memberEmails.size() >= 1 &&
+             data.memberEmails.size() <= 10 &&
+             data.memberEmails[0] is string &&
+             data.addedByEmail is string &&
+             data.addedByEmail.size() <= 160 &&
+             data.name is string &&
+             data.name.size() >= 1 &&
+             data.name.size() <= 120 &&
+             data.quantity is string &&
+             data.quantity.size() <= 40 &&
+             data.estimatedPrice is number &&
+             data.estimatedPrice >= 0 &&
+             data.estimatedPrice <= 1000000000 &&
+             data.bought is bool &&
+             data.note is string &&
+             data.note.size() <= 200 &&
+             data.createdAt is timestamp &&
+             data.createdAt <= request.time &&
+             data.updatedAt is timestamp &&
+             data.updatedAt <= request.time;
+    }
+
     match /users/{userId}/expenses/{expenseId} {
       allow list: if isOwner(userId);
       allow get: if isOwner(userId) && isValidId(expenseId);
@@ -285,6 +409,47 @@ service cloud.firestore {
       allow delete: if isOwner(userId) && isValidId(paymentId);
     }
 
+    match /users/{userId}/receivables/{receivableId} {
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(receivableId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(receivableId) &&
+                       incoming().keys().hasAll(['userId', 'personName', 'amount', 'collectedAmount', 'paymentMethod', 'note', 'dateMillis', 'monthKey', 'settled', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'personName', 'amount', 'collectedAmount', 'paymentMethod', 'note', 'dateMillis', 'monthKey', 'settled', 'createdAt', 'updatedAt']) &&
+                       isValidReceivable(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(receivableId) &&
+                       isValidReceivable(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['personName', 'amount', 'collectedAmount', 'paymentMethod', 'note', 'dateMillis', 'monthKey', 'settled', 'updatedAt']);
+
+      allow delete: if isOwner(userId) && isValidId(receivableId);
+    }
+
+    match /users/{userId}/receivablePayments/{paymentId} {
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId) && isValidId(paymentId);
+
+      allow create: if isOwner(userId) &&
+                       isValidId(paymentId) &&
+                       incoming().keys().hasAll(['userId', 'receivableId', 'personName', 'amount', 'paymentMethod', 'note', 'dateMillis', 'monthKey', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['userId', 'receivableId', 'personName', 'amount', 'paymentMethod', 'note', 'dateMillis', 'monthKey', 'createdAt', 'updatedAt']) &&
+                       isValidReceivablePayment(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(paymentId) &&
+                       isValidReceivablePayment(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().receivableId == existing().receivableId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['personName', 'amount', 'paymentMethod', 'note', 'dateMillis', 'monthKey', 'updatedAt']);
+
+      allow delete: if isOwner(userId) && isValidId(paymentId);
+    }
+
     match /users/{userId}/categories/{categoryId} {
       allow list: if isOwner(userId);
       allow get: if isOwner(userId) && isValidId(categoryId);
@@ -324,6 +489,70 @@ service cloud.firestore {
                        incoming().diff(existing()).affectedKeys().hasOnly(['totalLimit', 'categoryLimits', 'currencyCode', 'updatedAt']);
 
       allow delete: if isOwner(userId) && isValidId(budgetId);
+    }
+
+    match /marketLists/{listId} {
+      allow list: if isSignedIn() && (
+        existing().ownerUid == request.auth.uid ||
+        (isVerifiedEmail() && request.auth.token.email.lower() in existing().memberEmails)
+      );
+      allow get: if isValidId(listId) && isMarketMember(existing());
+
+      allow create: if isVerifiedEmail() &&
+                       isValidId(listId) &&
+                       incoming().ownerUid == request.auth.uid &&
+                       incoming().ownerEmail == request.auth.token.email.lower() &&
+                       incoming().keys().hasAll(['ownerUid', 'ownerEmail', 'ownerName', 'title', 'sharedWithEmail', 'memberEmails', 'note', 'completed', 'dateMillis', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['ownerUid', 'ownerEmail', 'ownerName', 'title', 'sharedWithEmail', 'memberEmails', 'note', 'completed', 'dateMillis', 'createdAt', 'updatedAt']) &&
+                       isValidMarketList(incoming());
+
+      allow update: if isValidId(listId) &&
+                       isMarketMember(existing()) &&
+                       isValidMarketList(incoming()) &&
+                       incoming().ownerUid == existing().ownerUid &&
+                       incoming().ownerEmail == existing().ownerEmail &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         (existing().ownerUid == request.auth.uid &&
+                          incoming().diff(existing()).affectedKeys().hasOnly(['ownerName', 'title', 'sharedWithEmail', 'memberEmails', 'note', 'completed', 'dateMillis', 'updatedAt'])) ||
+                         (incoming().diff(existing()).affectedKeys().hasOnly(['completed', 'note', 'updatedAt']))
+                       );
+
+      allow delete: if isSignedIn() && isValidId(listId) && existing().ownerUid == request.auth.uid;
+
+      match /items/{itemId} {
+        allow list: if isSignedIn() && (
+          existing().ownerUid == request.auth.uid ||
+          (isVerifiedEmail() && request.auth.token.email.lower() in existing().memberEmails)
+        );
+        allow get: if isValidId(listId) && isValidId(itemId) && isMarketMember(existing());
+
+        allow create: if isSignedIn() &&
+                         isValidId(listId) &&
+                         isValidId(itemId) &&
+                         incoming().keys().hasAll(['listId', 'ownerUid', 'memberEmails', 'addedByEmail', 'name', 'quantity', 'estimatedPrice', 'bought', 'note', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['listId', 'ownerUid', 'memberEmails', 'addedByEmail', 'name', 'quantity', 'estimatedPrice', 'bought', 'note', 'createdAt', 'updatedAt']) &&
+                         isValidMarketItem(incoming(), listId) &&
+                         getAfter(/databases/$(database)/documents/marketLists/$(listId)) != null &&
+                         isMarketMember(getAfter(/databases/$(database)/documents/marketLists/$(listId)).data) &&
+                         incoming().ownerUid == getAfter(/databases/$(database)/documents/marketLists/$(listId)).data.ownerUid &&
+                         incoming().memberEmails == getAfter(/databases/$(database)/documents/marketLists/$(listId)).data.memberEmails;
+
+        allow update: if isValidId(listId) &&
+                         isValidId(itemId) &&
+                         isMarketMember(existing()) &&
+                         isValidMarketItem(incoming(), listId) &&
+                         incoming().listId == existing().listId &&
+                         incoming().ownerUid == existing().ownerUid &&
+                         incoming().createdAt == existing().createdAt &&
+                         (
+                           (existing().ownerUid == request.auth.uid &&
+                            incoming().diff(existing()).affectedKeys().hasOnly(['memberEmails', 'name', 'quantity', 'estimatedPrice', 'bought', 'note', 'updatedAt'])) ||
+                           (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'quantity', 'estimatedPrice', 'bought', 'note', 'updatedAt']))
+                         );
+
+        allow delete: if isValidId(listId) && isValidId(itemId) && isMarketMember(existing());
+      }
     }
   }
 }

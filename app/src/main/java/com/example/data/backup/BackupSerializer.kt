@@ -10,6 +10,8 @@ import com.example.data.model.MonthlyBudget
 import com.example.data.model.Payable
 import com.example.data.model.PayablePayment
 import com.example.data.model.PaymentMethod
+import com.example.data.model.Receivable
+import com.example.data.model.ReceivablePayment
 import com.example.i18n.AppStrings
 import org.json.JSONArray
 import org.json.JSONObject
@@ -22,6 +24,8 @@ data class BackupPayload(
   val transfers: List<AccountTransfer> = emptyList(),
   val payables: List<Payable> = emptyList(),
   val payablePayments: List<PayablePayment> = emptyList(),
+  val receivables: List<Receivable> = emptyList(),
+  val receivablePayments: List<ReceivablePayment> = emptyList(),
 )
 
 object BackupSerializer {
@@ -34,10 +38,12 @@ object BackupSerializer {
     transfers: List<AccountTransfer> = emptyList(),
     payables: List<Payable> = emptyList(),
     payablePayments: List<PayablePayment> = emptyList(),
+    receivables: List<Receivable> = emptyList(),
+    receivablePayments: List<ReceivablePayment> = emptyList(),
   ): String {
     val root = JSONObject().apply {
       put("app", "Hisab")
-      put("version", 3)
+      put("version", 4)
       put("exportedAtMillis", System.currentTimeMillis())
 
       val expArr = JSONArray()
@@ -123,6 +129,41 @@ object BackupSerializer {
         )
       }
       put("payablePayments", pmtArr)
+
+      val recArr = JSONArray()
+      for (rec in receivables) {
+        recArr.put(
+          JSONObject().apply {
+            put("id", rec.id)
+            put("personName", rec.personName)
+            put("amount", rec.amount)
+            put("collectedAmount", rec.collectedAmount)
+            put("paymentMethod", rec.paymentMethod)
+            put("note", rec.note)
+            put("dateMillis", rec.dateMillis)
+            put("monthKey", rec.monthKey)
+            put("settled", rec.settled)
+          }
+        )
+      }
+      put("receivables", recArr)
+
+      val recPmtArr = JSONArray()
+      for (pmt in receivablePayments) {
+        recPmtArr.put(
+          JSONObject().apply {
+            put("id", pmt.id)
+            put("receivableId", pmt.receivableId)
+            put("personName", pmt.personName)
+            put("amount", pmt.amount)
+            put("paymentMethod", pmt.paymentMethod)
+            put("note", pmt.note)
+            put("dateMillis", pmt.dateMillis)
+            put("monthKey", pmt.monthKey)
+          }
+        )
+      }
+      put("receivablePayments", recPmtArr)
 
       val catArr = JSONArray()
       for (c in customCategories) {
@@ -290,6 +331,60 @@ object BackupSerializer {
       }
     }
 
+    val recArr = root.optJSONArray("receivables") ?: JSONArray()
+    val receivables = buildList {
+      for (i in 0 until recArr.length()) {
+        val obj = recArr.optJSONObject(i) ?: continue
+        val personName = obj.optString("personName", "").trim()
+        val amount = obj.optDouble("amount", 0.0)
+        if (personName.isEmpty() || amount <= 0.0 || amount.isNaN()) continue
+        val dateMillis = obj.optLong("dateMillis", System.currentTimeMillis())
+        val monthKey = obj.optString("monthKey", "").ifBlank {
+          DateFormatUtils.monthKeyFromMillis(dateMillis)
+        }
+        add(
+          Receivable(
+            id = obj.optString("id", ""),
+            personName = personName,
+            amount = amount,
+            collectedAmount = obj.optDouble("collectedAmount", 0.0).coerceAtLeast(0.0),
+            paymentMethod = PaymentMethod.fromWire(obj.optString("paymentMethod")).wireValue,
+            note = obj.optString("note", ""),
+            dateMillis = dateMillis,
+            monthKey = monthKey,
+            settled = obj.optBoolean("settled", false),
+          )
+        )
+      }
+    }
+
+    val recPmtArr = root.optJSONArray("receivablePayments") ?: JSONArray()
+    val receivablePayments = buildList {
+      for (i in 0 until recPmtArr.length()) {
+        val obj = recPmtArr.optJSONObject(i) ?: continue
+        val recId = obj.optString("receivableId", "").trim()
+        val personName = obj.optString("personName", "").trim()
+        val amount = obj.optDouble("amount", 0.0)
+        if (recId.isEmpty() || personName.isEmpty() || amount <= 0.0 || amount.isNaN()) continue
+        val dateMillis = obj.optLong("dateMillis", System.currentTimeMillis())
+        val monthKey = obj.optString("monthKey", "").ifBlank {
+          DateFormatUtils.monthKeyFromMillis(dateMillis)
+        }
+        add(
+          ReceivablePayment(
+            id = obj.optString("id", ""),
+            receivableId = recId,
+            personName = personName,
+            amount = amount,
+            paymentMethod = PaymentMethod.fromWire(obj.optString("paymentMethod")).wireValue,
+            note = obj.optString("note", ""),
+            dateMillis = dateMillis,
+            monthKey = monthKey,
+          )
+        )
+      }
+    }
+
     val catArr = root.optJSONArray("categories") ?: JSONArray()
     val categories = buildList {
       for (i in 0 until catArr.length()) {
@@ -341,6 +436,8 @@ object BackupSerializer {
       transfers = transfers,
       payables = payables,
       payablePayments = payablePayments,
+      receivables = receivables,
+      receivablePayments = receivablePayments,
     )
   }
 
@@ -362,6 +459,8 @@ object BackupSerializer {
     transfers: List<AccountTransfer> = emptyList(),
     payables: List<Payable> = emptyList(),
     payablePayments: List<PayablePayment> = emptyList(),
+    receivables: List<Receivable> = emptyList(),
+    receivablePayments: List<ReceivablePayment> = emptyList(),
   ): String {
     val sb = StringBuilder()
     // UTF-8 BOM so Bengali & Hindi text opens cleanly in Microsoft Excel
@@ -396,6 +495,12 @@ object BackupSerializer {
       }
       for (pmt in payablePayments) {
         add(CsvRow(pmt.dateMillis, strings.entryTypeRepayment, pmt.personName, strings.entryTypeRepayment, methodLabel(pmt.paymentMethod, strings), "-${pmt.amount}", pmt.note))
+      }
+      for (rec in receivables) {
+        add(CsvRow(rec.dateMillis, strings.entryTypeLend, rec.personName, strings.entryTypeLend, methodLabel(rec.paymentMethod, strings), "-${rec.amount}", rec.note))
+      }
+      for (pmt in receivablePayments) {
+        add(CsvRow(pmt.dateMillis, strings.entryTypeCollection, pmt.personName, strings.entryTypeCollection, methodLabel(pmt.paymentMethod, strings), "+${pmt.amount}", pmt.note))
       }
     }.sortedByDescending { it.dateMillis }
 
