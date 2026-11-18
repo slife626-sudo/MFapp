@@ -1,5 +1,6 @@
 package com.example.i18n
 
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.compositionLocalOf
 
 enum class AppLanguage(val code: String, val displayName: String) {
@@ -13,1037 +14,1038 @@ enum class AppLanguage(val code: String, val displayName: String) {
   }
 }
 
-data class AppStrings(
-  val appName: String,
-  val tagline: String,
-  val navExpenses: String,
-  val navReports: String,
-  val navBudgets: String,
-  val navSettings: String,
-  val signInTitle: String,
-  val signInSubtitle: String,
-  val signInWithGoogle: String,
-  val adFreeBadge: String,
-  val featureOfflineTitle: String,
-  val featureOfflineDesc: String,
-  val featureCloudTitle: String,
-  val featureCloudDesc: String,
-  val featureDriveTitle: String,
-  val featureDriveDesc: String,
-  val onlineSynced: String,
-  val offlineModeActive: String,
-  val offlineCached: String,
-  val syncingPending: String,
-  val thisMonthSpend: String,
-  val budgetRemaining: String,
-  val budgetExceededBy: String,
-  val setBudgetHint: String,
-  val dailyAllowance: String,
-  val today: String,
-  val yesterday: String,
-  val allCategories: String,
-  val searchExpenses: String,
-  val addExpense: String,
-  val editExpense: String,
-  val expenseTitleLabel: String,
-  val amountLabel: String,
-  val categoryLabel: String,
-  val paymentMethodLabel: String,
-  val dateLabel: String,
-  val noteOptionalLabel: String,
-  val save: String,
-  val cancel: String,
-  val delete: String,
-  val confirmDeleteTitle: String,
-  val confirmDeleteMessage: String,
-  val emptyExpensesTitle: String,
-  val emptyExpensesBody: String,
-  val addCustomCategory: String,
-  val customCategoryName: String,
-  val chooseColor: String,
-  val chooseIcon: String,
-  val cash: String,
-  val card: String,
-  val mobileBanking: String,
-  val bank: String,
-  val monthlyReportTitle: String,
-  val totalSpent: String,
-  val dailyAverage: String,
-  val transactionsCount: String,
-  val topCategory: String,
-  val vsPrevMonth: String,
-  val categoryChartTitle: String,
-  val dailyTrendTitle: String,
-  val sixMonthChartTitle: String,
-  val categoryBreakdown: String,
-  val tapBarHint: String,
-  val noDataForMonth: String,
-  val budgetSettingsTitle: String,
-  val monthlyBudgetLimit: String,
-  val categoryBudgetsTitle: String,
-  val saveBudget: String,
-  val budgetSaved: String,
-  val spentOf: String,
-  val reminderSettingsTitle: String,
-  val dailyReminderLabel: String,
-  val dailyReminderDesc: String,
-  val reminderTimeLabel: String,
-  val budgetAlertsLabel: String,
-  val budgetAlertsDesc: String,
-  val notificationPermNeeded: String,
-  val grantPermission: String,
-  val settingsTitle: String,
-  val accountSection: String,
-  val signOut: String,
-  val syncSection: String,
-  val cloudSyncToggle: String,
-  val cloudSyncDesc: String,
-  val driveBackupSection: String,
-  val backUpToDrive: String,
-  val restoreFromDrive: String,
-  val lastDriveBackup: String,
-  val neverBackedUp: String,
-  val driveBackupSuccess: String,
-  val driveRestoreSuccess: String,
-  val chooseBackupTitle: String,
-  val noDriveBackups: String,
-  val localExportSection: String,
-  val exportCsv: String,
-  val exportJson: String,
-  val importJson: String,
-  val exportSuccess: String,
-  val importSuccess: String,
-  val securitySection: String,
-  val pinLockToggle: String,
-  val pinLockDesc: String,
-  val changePin: String,
-  val lockOnBackground: String,
-  val enterPinTitle: String,
-  val createPinTitle: String,
-  val confirmPinTitle: String,
-  val pinMismatch: String,
-  val wrongPin: String,
-  val pinSaved: String,
-  val appearanceSection: String,
-  val themeModeLabel: String,
-  val themeSystem: String,
-  val themeLight: String,
-  val themeDark: String,
-  val themePaletteLabel: String,
-  val languageCurrencySection: String,
-  val languageLabel: String,
-  val currencyLabel: String,
-  val customCategoriesSection: String,
-  val adFreeNotice: String,
-  val invalidInputError: String,
-  val catFood: String,
-  val catTransport: String,
-  val catGroceries: String,
-  val catUtilities: String,
-  val catShopping: String,
-  val catHealth: String,
-  val catEducation: String,
-  val catEntertainment: String,
-  val catFamily: String,
-  val catOther: String,
-  val budgetAlert80Title: String,
-  val budgetAlert100Title: String,
-  val reminderNotificationTitle: String,
-  val reminderNotificationBody: String,
-  val themeEmerald: String,
-  val themeIndigo: String,
-  val themeTerracotta: String,
-  val themeOcean: String,
-  val themePlum: String,
-  val remainingBalance: String,
-  val addedBalance: String,
-  val addBalance: String,
-  val editBalance: String,
-  val balanceTitleLabel: String,
-  val balanceFilterChip: String,
-  val expenseTypeTab: String,
-  val balanceTypeTab: String,
-  val receiveMethodLabel: String,
-  val confirmDeleteBalanceTitle: String,
-  val confirmDeleteBalanceMessage: String,
-  val overallWalletBalance: String,
-  val entryTypeExpense: String,
-  val entryTypeIncome: String,
-  val navWallets: String,
-  val transferTypeTab: String,
-  val borrowTypeTab: String,
-  val addTransfer: String,
-  val editTransfer: String,
-  val fromAccountLabel: String,
-  val toAccountLabel: String,
-  val sameAccountTransferError: String,
-  val addBorrow: String,
-  val editBorrow: String,
-  val lenderNameLabel: String,
-  val borrowAutoPayableHint: String,
-  val transferFilterChip: String,
-  val payableFilterChip: String,
-  val walletsScreenTitle: String,
-  val accountBalancesTitle: String,
-  val totalPayablesLabel: String,
-  val unpaidPayablesTitle: String,
-  val settledPayablesTitle: String,
-  val noPayablesEmpty: String,
-  val repayButton: String,
-  val repayPayableTitle: String,
-  val paidFromAccountLabel: String,
-  val paidAmountLabel: String,
-  val dueAmountLabel: String,
-  val settledBadge: String,
-  val repaymentHistoryTitle: String,
-  val transferHistoryTitle: String,
-  val quickTransferAction: String,
-  val quickBorrowAction: String,
-  val confirmDeleteTransferTitle: String,
-  val confirmDeleteTransferMessage: String,
-  val confirmDeletePayableTitle: String,
-  val confirmDeletePayableMessage: String,
-  val confirmDeleteRepaymentTitle: String,
-  val confirmDeleteRepaymentMessage: String,
-  val entryTypeTransfer: String,
-  val entryTypeBorrow: String,
-  val entryTypeRepayment: String,
-  val walletCashLabel: String,
-  val lendTypeTab: String,
-  val addLend: String,
-  val editLend: String,
-  val borrowerNameLabel: String,
-  val lendAutoReceivableHint: String,
-  val lendFromAccountLabel: String,
-  val receivableFilterChip: String,
-  val totalReceivablesLabel: String,
-  val unpaidReceivablesTitle: String,
-  val settledReceivablesTitle: String,
-  val noReceivablesEmpty: String,
-  val collectButton: String,
-  val collectReceivableTitle: String,
-  val collectedToAccountLabel: String,
-  val collectedAmountLabel: String,
-  val collectionHistoryTitle: String,
-  val quickLendAction: String,
-  val confirmDeleteReceivableTitle: String,
-  val confirmDeleteReceivableMessage: String,
-  val confirmDeleteCollectionTitle: String,
-  val confirmDeleteCollectionMessage: String,
-  val entryTypeLend: String,
-  val entryTypeCollection: String,
-  val payablesTab: String,
-  val receivablesTab: String,
-  val marketListTitle: String,
-  val marketCardTitle: String,
-  val marketCardSubtitle: String,
-  val marketNewListButton: String,
-  val marketListNameLabel: String,
-  val shareWithEmailLabel: String,
-  val shareWithEmailHint: String,
-  val sharedByLabel: String,
-  val sharedWithLabel: String,
-  val noMarketListsTitle: String,
-  val noMarketListsBody: String,
-  val itemNameLabel: String,
-  val itemQtyLabel: String,
-  val itemPriceOptionalLabel: String,
-  val addItemButton: String,
-  val boughtLabel: String,
-  val remainingItemsLabel: String,
-  val estimatedTotalLabel: String,
-  val logAsExpenseButton: String,
-  val markCompletedButton: String,
-  val reopenListButton: String,
-  val shareListTitle: String,
-  val shareListButton: String,
-  val shareViaTextButton: String,
-  val marketExpenseSaved: String,
-  val confirmDeleteMarketListTitle: String,
-  val confirmDeleteMarketListMessage: String,
-  val editItemTitle: String,
-  val completedBadge: String,
-  val activeBadge: String,
-  val sharedListSavedMsg: String,
-  val splitByCategoryOption: String,
-  val singleCategoryOption: String,
-  val marketSplitExpenseSaved: String,
-  val itemCategoryLabel: String,
-)
+@Immutable
+interface AppStrings {
+  val appName: String
+  val tagline: String
+  val navExpenses: String
+  val navReports: String
+  val navBudgets: String
+  val navSettings: String
+  val signInTitle: String
+  val signInSubtitle: String
+  val signInWithGoogle: String
+  val adFreeBadge: String
+  val featureOfflineTitle: String
+  val featureOfflineDesc: String
+  val featureCloudTitle: String
+  val featureCloudDesc: String
+  val featureDriveTitle: String
+  val featureDriveDesc: String
+  val onlineSynced: String
+  val offlineModeActive: String
+  val offlineCached: String
+  val syncingPending: String
+  val thisMonthSpend: String
+  val budgetRemaining: String
+  val budgetExceededBy: String
+  val setBudgetHint: String
+  val dailyAllowance: String
+  val today: String
+  val yesterday: String
+  val allCategories: String
+  val searchExpenses: String
+  val addExpense: String
+  val editExpense: String
+  val expenseTitleLabel: String
+  val amountLabel: String
+  val categoryLabel: String
+  val paymentMethodLabel: String
+  val dateLabel: String
+  val noteOptionalLabel: String
+  val save: String
+  val cancel: String
+  val delete: String
+  val confirmDeleteTitle: String
+  val confirmDeleteMessage: String
+  val emptyExpensesTitle: String
+  val emptyExpensesBody: String
+  val addCustomCategory: String
+  val customCategoryName: String
+  val chooseColor: String
+  val chooseIcon: String
+  val cash: String
+  val card: String
+  val mobileBanking: String
+  val bank: String
+  val monthlyReportTitle: String
+  val totalSpent: String
+  val dailyAverage: String
+  val transactionsCount: String
+  val topCategory: String
+  val vsPrevMonth: String
+  val categoryChartTitle: String
+  val dailyTrendTitle: String
+  val sixMonthChartTitle: String
+  val categoryBreakdown: String
+  val tapBarHint: String
+  val noDataForMonth: String
+  val budgetSettingsTitle: String
+  val monthlyBudgetLimit: String
+  val categoryBudgetsTitle: String
+  val saveBudget: String
+  val budgetSaved: String
+  val spentOf: String
+  val reminderSettingsTitle: String
+  val dailyReminderLabel: String
+  val dailyReminderDesc: String
+  val reminderTimeLabel: String
+  val budgetAlertsLabel: String
+  val budgetAlertsDesc: String
+  val notificationPermNeeded: String
+  val grantPermission: String
+  val settingsTitle: String
+  val accountSection: String
+  val signOut: String
+  val syncSection: String
+  val cloudSyncToggle: String
+  val cloudSyncDesc: String
+  val driveBackupSection: String
+  val backUpToDrive: String
+  val restoreFromDrive: String
+  val lastDriveBackup: String
+  val neverBackedUp: String
+  val driveBackupSuccess: String
+  val driveRestoreSuccess: String
+  val chooseBackupTitle: String
+  val noDriveBackups: String
+  val localExportSection: String
+  val exportCsv: String
+  val exportJson: String
+  val importJson: String
+  val exportSuccess: String
+  val importSuccess: String
+  val securitySection: String
+  val pinLockToggle: String
+  val pinLockDesc: String
+  val changePin: String
+  val lockOnBackground: String
+  val enterPinTitle: String
+  val createPinTitle: String
+  val confirmPinTitle: String
+  val pinMismatch: String
+  val wrongPin: String
+  val pinSaved: String
+  val appearanceSection: String
+  val themeModeLabel: String
+  val themeSystem: String
+  val themeLight: String
+  val themeDark: String
+  val themePaletteLabel: String
+  val languageCurrencySection: String
+  val languageLabel: String
+  val currencyLabel: String
+  val customCategoriesSection: String
+  val adFreeNotice: String
+  val invalidInputError: String
+  val catFood: String
+  val catTransport: String
+  val catGroceries: String
+  val catUtilities: String
+  val catShopping: String
+  val catHealth: String
+  val catEducation: String
+  val catEntertainment: String
+  val catFamily: String
+  val catOther: String
+  val budgetAlert80Title: String
+  val budgetAlert100Title: String
+  val reminderNotificationTitle: String
+  val reminderNotificationBody: String
+  val themeEmerald: String
+  val themeIndigo: String
+  val themeTerracotta: String
+  val themeOcean: String
+  val themePlum: String
+  val remainingBalance: String
+  val addedBalance: String
+  val addBalance: String
+  val editBalance: String
+  val balanceTitleLabel: String
+  val balanceFilterChip: String
+  val expenseTypeTab: String
+  val balanceTypeTab: String
+  val receiveMethodLabel: String
+  val confirmDeleteBalanceTitle: String
+  val confirmDeleteBalanceMessage: String
+  val overallWalletBalance: String
+  val entryTypeExpense: String
+  val entryTypeIncome: String
+  val navWallets: String
+  val transferTypeTab: String
+  val borrowTypeTab: String
+  val addTransfer: String
+  val editTransfer: String
+  val fromAccountLabel: String
+  val toAccountLabel: String
+  val sameAccountTransferError: String
+  val addBorrow: String
+  val editBorrow: String
+  val lenderNameLabel: String
+  val borrowAutoPayableHint: String
+  val transferFilterChip: String
+  val payableFilterChip: String
+  val walletsScreenTitle: String
+  val accountBalancesTitle: String
+  val totalPayablesLabel: String
+  val unpaidPayablesTitle: String
+  val settledPayablesTitle: String
+  val noPayablesEmpty: String
+  val repayButton: String
+  val repayPayableTitle: String
+  val paidFromAccountLabel: String
+  val paidAmountLabel: String
+  val dueAmountLabel: String
+  val settledBadge: String
+  val repaymentHistoryTitle: String
+  val transferHistoryTitle: String
+  val quickTransferAction: String
+  val quickBorrowAction: String
+  val confirmDeleteTransferTitle: String
+  val confirmDeleteTransferMessage: String
+  val confirmDeletePayableTitle: String
+  val confirmDeletePayableMessage: String
+  val confirmDeleteRepaymentTitle: String
+  val confirmDeleteRepaymentMessage: String
+  val entryTypeTransfer: String
+  val entryTypeBorrow: String
+  val entryTypeRepayment: String
+  val walletCashLabel: String
+  val lendTypeTab: String
+  val addLend: String
+  val editLend: String
+  val borrowerNameLabel: String
+  val lendAutoReceivableHint: String
+  val lendFromAccountLabel: String
+  val receivableFilterChip: String
+  val totalReceivablesLabel: String
+  val unpaidReceivablesTitle: String
+  val settledReceivablesTitle: String
+  val noReceivablesEmpty: String
+  val collectButton: String
+  val collectReceivableTitle: String
+  val collectedToAccountLabel: String
+  val collectedAmountLabel: String
+  val collectionHistoryTitle: String
+  val quickLendAction: String
+  val confirmDeleteReceivableTitle: String
+  val confirmDeleteReceivableMessage: String
+  val confirmDeleteCollectionTitle: String
+  val confirmDeleteCollectionMessage: String
+  val entryTypeLend: String
+  val entryTypeCollection: String
+  val payablesTab: String
+  val receivablesTab: String
+  val marketListTitle: String
+  val marketCardTitle: String
+  val marketCardSubtitle: String
+  val marketNewListButton: String
+  val marketListNameLabel: String
+  val shareWithEmailLabel: String
+  val shareWithEmailHint: String
+  val sharedByLabel: String
+  val sharedWithLabel: String
+  val noMarketListsTitle: String
+  val noMarketListsBody: String
+  val itemNameLabel: String
+  val itemQtyLabel: String
+  val itemPriceOptionalLabel: String
+  val addItemButton: String
+  val boughtLabel: String
+  val remainingItemsLabel: String
+  val estimatedTotalLabel: String
+  val logAsExpenseButton: String
+  val markCompletedButton: String
+  val reopenListButton: String
+  val shareListTitle: String
+  val shareListButton: String
+  val shareViaTextButton: String
+  val marketExpenseSaved: String
+  val confirmDeleteMarketListTitle: String
+  val confirmDeleteMarketListMessage: String
+  val editItemTitle: String
+  val completedBadge: String
+  val activeBadge: String
+  val sharedListSavedMsg: String
+  val splitByCategoryOption: String
+  val singleCategoryOption: String
+  val marketSplitExpenseSaved: String
+  val itemCategoryLabel: String
+}
 
-val BengaliStrings = AppStrings(
-  appName = "হিসাব",
-  tagline = "আপনার দৈনন্দিন খরচের সহজ ও নিরাপদ সঙ্গী",
-  navExpenses = "খরচ",
-  navReports = "রিপোর্ট",
-  navBudgets = "বাজেট",
-  navSettings = "সেটিংস",
-  signInTitle = "হিসাব-এ স্বাগতম",
-  signInSubtitle = "বিজ্ঞাপন-মুক্ত দৈনন্দিন খরচের হিসাব, অফলাইন ব্যবহার, ক্লাউড সিঙ্ক এবং গুগল ড্রাইভ ব্যাকআপ একসাথে।",
-  signInWithGoogle = "Google দিয়ে সাইন ইন করুন",
-  adFreeBadge = "১০০% বিজ্ঞাপন মুক্ত",
-  featureOfflineTitle = "অফলাইন মোড",
-  featureOfflineDesc = "ইন্টারনেট ছাড়াই খরচ লিখুন ও দেখুন",
-  featureCloudTitle = "ক্লাউড সিঙ্ক",
-  featureCloudDesc = "সব ডিভাইসে স্বয়ংক্রিয়ভাবে ডাটা নিরাপদ থাকবে",
-  featureDriveTitle = "গুগল ড্রাইভ ব্যাকআপ",
-  featureDriveDesc = "এক ক্লিকে ড্রাইভে ব্যাকআপ ও রিস্টোর করুন",
-  onlineSynced = "অনলাইন • সিঙ্ক সম্পন্ন",
-  offlineModeActive = "অফলাইন মোড চালু",
-  offlineCached = "অফলাইন • লোকাল সেভ",
-  syncingPending = "সিঙ্ক হচ্ছে...",
-  thisMonthSpend = "এই মাসের মোট খরচ",
-  budgetRemaining = "বাজেট বাকি আছে",
-  budgetExceededBy = "বাজেট অতিক্রম করেছে",
-  setBudgetHint = "মাসিক বাজেট সেট করুন",
-  dailyAllowance = "দৈনিক গড় বরাদ্দ",
-  today = "আজ",
-  yesterday = "গতকাল",
-  allCategories = "সব বিভাগ",
-  searchExpenses = "খরচ খুঁজুন...",
-  addExpense = "নতুন খরচ যোগ করুন",
-  editExpense = "খরচ সম্পাদনা করুন",
-  expenseTitleLabel = "খরচের বিবরণ (যেমন: দুপুরের খাবার)",
-  amountLabel = "পরিমাণ",
-  categoryLabel = "বিভাগ নির্বাচন করুন",
-  paymentMethodLabel = "পেমেন্ট মাধ্যম",
-  dateLabel = "তারিখ",
-  noteOptionalLabel = "নোট (ঐচ্ছিক)",
-  save = "সংরক্ষণ করুন",
-  cancel = "বাতিল",
-  delete = "মুছে ফেলুন",
-  confirmDeleteTitle = "খরচটি মুছে ফেলবেন?",
-  confirmDeleteMessage = "এই খরচের রেকর্ডটি স্থায়ীভাবে মুছে যাবে।",
-  emptyExpensesTitle = "এখনও কোনো খরচ লেখা হয়নি",
-  emptyExpensesBody = "নিচের '+' বোতামে ট্যাপ করে আপনার প্রথম দৈনন্দিন খরচ যোগ করুন।",
-  addCustomCategory = "নতুন বিভাগ",
-  customCategoryName = "বিভাগের নাম",
-  chooseColor = "রঙ বাছাই করুন",
-  chooseIcon = "আইকন বাছাই করুন",
-  cash = "নগদ",
-  card = "কার্ড",
-  mobileBanking = "মোবাইল ব্যাংকিং",
-  bank = "ব্যাংক",
-  monthlyReportTitle = "মাসিক রিপোর্ট",
-  totalSpent = "মোট খরচ",
-  dailyAverage = "দৈনিক গড়",
-  transactionsCount = "মোট লেনদেন",
-  topCategory = "সর্বোচ্চ বিভাগ",
-  vsPrevMonth = "আগের মাসের তুলনায়",
-  categoryChartTitle = "বিভাগ অনুযায়ী খরচের চিত্র",
-  dailyTrendTitle = "দৈনিক খরচের গ্রাফ",
-  sixMonthChartTitle = "গত ৬ মাসের তুলনামূলক চিত্র",
-  categoryBreakdown = "বিভাগভিত্তিক বিস্তারিত",
-  tapBarHint = "বিস্তারিত দেখতে যেকোনো বার বা অংশে ট্যাপ করুন",
-  noDataForMonth = "এই মাসে কোনো খরচের ডাটা নেই",
-  budgetSettingsTitle = "বাজেট ও রিমাইন্ডার",
-  monthlyBudgetLimit = "মাসিক মোট বাজেট",
-  categoryBudgetsTitle = "বিভাগ অনুযায়ী বাজেট",
-  saveBudget = "বাজেট সংরক্ষণ করুন",
-  budgetSaved = "বাজেট সফলভাবে সংরক্ষিত হয়েছে",
-  spentOf = "খরচ হয়েছে /",
-  reminderSettingsTitle = "নোটিফিকেশন রিমাইন্ডার",
-  dailyReminderLabel = "দৈনিক খরচ লেখার রিমাইন্ডার",
-  dailyReminderDesc = "প্রতিদিন নির্দিষ্ট সময়ে আপনাকে মনে করিয়ে দেবে",
-  reminderTimeLabel = "রিমাইন্ডার সময়",
-  budgetAlertsLabel = "বাজেট সতর্কতা নোটিফিকেশন",
-  budgetAlertsDesc = "বাজেটের ৮০% বা ১০০% পার হলে সতর্ক করবে",
-  notificationPermNeeded = "রিমাইন্ডার পেতে নোটিফিকেশন অনুমতি দিন",
-  grantPermission = "অনুমতি দিন",
-  settingsTitle = "সেটিংস ও ব্যাকআপ",
-  accountSection = "অ্যাকাউন্ট",
-  signOut = "সাইন আউট",
-  syncSection = "ক্লাউড সিঙ্ক ও অফলাইন মোড",
-  cloudSyncToggle = "অটো ক্লাউড সিঙ্ক",
-  cloudSyncDesc = "বন্ধ করলে অ্যাপটি সম্পূর্ণ অফলাইন মোডে চলবে",
-  driveBackupSection = "গুগল ড্রাইভ ব্যাকআপ",
-  backUpToDrive = "গুগল ড্রাইভে ব্যাকআপ নিন",
-  restoreFromDrive = "গুগল ড্রাইভ থেকে রিস্টোর করুন",
-  lastDriveBackup = "সর্বশেষ ড্রাইভ ব্যাকআপ",
-  neverBackedUp = "এখনও ব্যাকআপ নেওয়া হয়নি",
-  driveBackupSuccess = "গুগল ড্রাইভে ব্যাকআপ সফল হয়েছে!",
-  driveRestoreSuccess = "গুগল ড্রাইভ থেকে ডাটা রিস্টোর হয়েছে!",
-  chooseBackupTitle = "রিস্টোর করার জন্য ব্যাকআপ বেছে নিন",
-  noDriveBackups = "গুগল ড্রাইভে কোনো ব্যাকআপ পাওয়া যায়নি",
-  localExportSection = "ডাটা এক্সপোর্ট ও লোকাল ব্যাকআপ",
-  exportCsv = "CSV এক্সপোর্ট (Excel)",
-  exportJson = "JSON ব্যাকআপ সেভ করুন",
-  importJson = "JSON ব্যাকআপ ইমপোর্ট করুন",
-  exportSuccess = "ফাইল সফলভাবে এক্সপোর্ট হয়েছে",
-  importSuccess = "ব্যাকআপ ডাটা সফলভাবে ইমপোর্ট হয়েছে",
-  securitySection = "পাসওয়ার্ড / পিন সুরক্ষা",
-  pinLockToggle = "অ্যাপ পিন লক চালু করুন",
-  pinLockDesc = "অ্যাপ খোলার সময় ৪-সংখ্যার পিন চাইবে",
-  changePin = "পিন পরিবর্তন করুন",
-  lockOnBackground = "ব্যাকগ্রাউন্ডে গেলে লক করুন",
-  enterPinTitle = "অ্যাপ আনলক করতে পিন দিন",
-  createPinTitle = "নতুন ৪-সংখ্যার পিন সেট করুন",
-  confirmPinTitle = "পিনটি পুনরায় নিশ্চিত করুন",
-  pinMismatch = "পিন মেলেনি, আবার চেষ্টা করুন",
-  wrongPin = "ভুল পিন! আবার চেষ্টা করুন",
-  pinSaved = "পিন সুরক্ষা সক্রিয় হয়েছে",
-  appearanceSection = "থিম ও ডার্ক মোড",
-  themeModeLabel = "ডিসপ্লে মোড",
-  themeSystem = "সিস্টেম",
-  themeLight = "লাইট",
-  themeDark = "ডার্ক",
-  themePaletteLabel = "কাস্টম রঙের থিম",
-  languageCurrencySection = "ভাষা ও মুদ্রা",
-  languageLabel = "অ্যাপের ভাষা",
-  currencyLabel = "মুদ্রা (Currency)",
-  customCategoriesSection = "কাস্টম বিভাগসমূহ",
-  adFreeNotice = "হিসাব সম্পূর্ণ বিজ্ঞাপন-মুক্ত এবং আপনার ডাটা শুধুমাত্র আপনার নিয়ন্ত্রণে থাকে।",
-  invalidInputError = "অনুগ্রহ করে সঠিক বিবরণ ও ০-এর বেশি পরিমাণ লিখুন",
-  catFood = "খাবার",
-  catTransport = "যাতায়াত",
-  catGroceries = "বাজার",
-  catUtilities = "বিল ও ইউটিলিটি",
-  catShopping = "কেনাকাটা",
-  catHealth = "স্বাস্থ্য",
-  catEducation = "শিক্ষা",
-  catEntertainment = "বিনোদন",
-  catFamily = "পরিবার ও উপহার",
-  catOther = "অন্যান্য",
-  budgetAlert80Title = "বাজেট সতর্কতা (৮০%+)",
-  budgetAlert100Title = "বাজেট সীমা অতিক্রম!",
-  reminderNotificationTitle = "আজকের খরচের হিসাব লিখেছেন?",
-  reminderNotificationBody = "হিসাব অ্যাপে আজকের খরচগুলো যোগ করতে ভুলবেন না।",
-  themeEmerald = "এমেরাল্ড",
-  themeIndigo = "ইন্ডিগো",
-  themeTerracotta = "টেরাকোটা",
-  themeOcean = "ওশান",
-  themePlum = "প্লাম",
-  remainingBalance = "অবশিষ্ট ব্যালেন্স",
-  addedBalance = "মোট ব্যালেন্স যোগ",
-  addBalance = "ব্যালেন্স যোগ করুন",
-  editBalance = "ব্যালেন্স সম্পাদনা করুন",
-  balanceTitleLabel = "ব্যালেন্সের উৎস (যেমন: বেতন, ক্যাশ জমা)",
-  balanceFilterChip = "ব্যালেন্স (+)",
-  expenseTypeTab = "খরচ (-)",
-  balanceTypeTab = "ব্যালেন্স (+)",
-  receiveMethodLabel = "জমার মাধ্যম",
-  confirmDeleteBalanceTitle = "ব্যালেন্স এন্ট্রি মুছে ফেলবেন?",
-  confirmDeleteBalanceMessage = "এই ব্যালেন্স জমার রেকর্ডটি স্থায়ীভাবে মুছে যাবে।",
-  overallWalletBalance = "সর্বমোট ওয়ালেট ব্যালেন্স",
-  entryTypeExpense = "খরচ",
-  entryTypeIncome = "ব্যালেন্স",
-  navWallets = "ওয়ালেট",
-  transferTypeTab = "ট্রান্সফার",
-  borrowTypeTab = "ধার (+)",
-  addTransfer = "অ্যাকাউন্ট ট্রান্সফার",
-  editTransfer = "ট্রান্সফার সম্পাদনা",
-  fromAccountLabel = "যে অ্যাকাউন্ট থেকে (From)",
-  toAccountLabel = "যে অ্যাকাউন্টে যাবে (To)",
-  sameAccountTransferError = "প্রেরক ও প্রাপক অ্যাকাউন্ট আলাদা হতে হবে",
-  addBorrow = "ধার গ্রহণ (Payable)",
-  editBorrow = "ধারের হিসাব সম্পাদনা",
-  lenderNameLabel = "যার থেকে ধার নিলেন (নাম)",
-  borrowAutoPayableHint = "এই টাকা নির্বাচিত অ্যাকাউন্টে যোগ হবে এবং স্বয়ংক্রিয়ভাবে পাওনাদার (Payable) তৈরি হবে।",
-  transferFilterChip = "ট্রান্সফার (⇄)",
-  payableFilterChip = "ধার / দেনা",
-  walletsScreenTitle = "ওয়ালেট ও দেনা",
-  accountBalancesTitle = "অ্যাকাউন্ট অনুযায়ী ব্যালেন্স",
-  totalPayablesLabel = "মোট দেনা (Payable)",
-  unpaidPayablesTitle = "বাকি দেনা (Payables)",
-  settledPayablesTitle = "পরিশোধিত দেনা",
-  noPayablesEmpty = "কোনো বাকি দেনা নেই",
-  repayButton = "শোধ করুন",
-  repayPayableTitle = "দেনা পরিশোধ করুন",
-  paidFromAccountLabel = "যে অ্যাকাউন্ট থেকে পরিশোধ",
-  paidAmountLabel = "পরিশোধিত",
-  dueAmountLabel = "বাকি আছে",
-  settledBadge = "পরিশোধিত",
-  repaymentHistoryTitle = "পরিশোধের ইতিহাস",
-  transferHistoryTitle = "অ্যাকাউন্ট ট্রান্সফারসমূহ",
-  quickTransferAction = "ট্রান্সফার",
-  quickBorrowAction = "ধার (+)",
-  confirmDeleteTransferTitle = "ট্রান্সফার মুছে ফেলবেন?",
-  confirmDeleteTransferMessage = "এই ট্রান্সফার রেকর্ডটি স্থায়ীভাবে মুছে যাবে এবং অ্যাকাউন্ট ব্যালেন্স আপডেট হবে।",
-  confirmDeletePayableTitle = "দেনার রেকর্ড মুছে ফেলবেন?",
-  confirmDeletePayableMessage = "এই ধারের রেকর্ড ও এর সব পরিশোধের তথ্য স্থায়ীভাবে মুছে যাবে।",
-  confirmDeleteRepaymentTitle = "পরিশোধ মুছে ফেলবেন?",
-  confirmDeleteRepaymentMessage = "এই পরিশোধ মুছে ফেললে দেনার বাকি পরিমাণ আবার বেড়ে যাবে।",
-  entryTypeTransfer = "ট্রান্সফার",
-  entryTypeBorrow = "ধার (Payable)",
-  entryTypeRepayment = "দেনা শোধ",
-  walletCashLabel = "নগদ (ওয়ালেট)",
-  lendTypeTab = "ধার দেওয়া",
-  addLend = "ধার দেওয়া (পাওনা)",
-  editLend = "পাওনা সম্পাদনা",
-  borrowerNameLabel = "যাকে ধার দিলেন (নাম)",
-  lendAutoReceivableHint = "এই টাকা নির্বাচিত অ্যাকাউন্ট থেকে কমবে এবং স্বয়ংক্রিয়ভাবে আপনার পাওনা (Receivable) হিসেবে যুক্ত হবে।",
-  lendFromAccountLabel = "যে অ্যাকাউন্ট থেকে দিলেন",
-  receivableFilterChip = "পাওনা (ধার দেওয়া)",
-  totalReceivablesLabel = "মোট পাওনা (Receivable)",
-  unpaidReceivablesTitle = "বাকি পাওনা (Receivables)",
-  settledReceivablesTitle = "আদায়কৃত পাওনা",
-  noReceivablesEmpty = "কোনো বাকি পাওনা নেই",
-  collectButton = "আদায় করুন",
-  collectReceivableTitle = "পাওনা আদায় করুন",
-  collectedToAccountLabel = "যে অ্যাকাউন্টে পেলেন",
-  collectedAmountLabel = "আদায় হয়েছে",
-  collectionHistoryTitle = "আদায়ের ইতিহাস",
-  quickLendAction = "ধার দেওয়া (-)",
-  confirmDeleteReceivableTitle = "পাওনার রেকর্ড মুছে ফেলবেন?",
-  confirmDeleteReceivableMessage = "এই পাওনা ও এর সব আদায়ের তথ্য স্থায়ীভাবে মুছে যাবে।",
-  confirmDeleteCollectionTitle = "আদায় মুছে ফেলবেন?",
-  confirmDeleteCollectionMessage = "এই আদায় মুছে ফেললে পাওনার বাকি পরিমাণ আবার বেড়ে যাবে।",
-  entryTypeLend = "ধার দেওয়া (পাওনা)",
-  entryTypeCollection = "পাওনা আদায়",
-  payablesTab = "দেনা (নিয়েছি)",
-  receivablesTab = "পাওনা (দিয়েছি)",
-  marketListTitle = "বাজার লিস্ট",
-  marketCardTitle = "বাজার লিস্ট ও শেয়ার",
-  marketCardSubtitle = "নতুন বাজার লিস্ট বানান বা ইমেইলে পাঠান",
-  marketNewListButton = "নতুন লিস্ট",
-  marketListNameLabel = "লিস্টের নাম (যেমন: আজকের বাজার)",
-  shareWithEmailLabel = "যার ইমেইলে পাঠাবেন (ঐচ্ছিক)",
-  shareWithEmailHint = "যেমন: wife@gmail.com — দিলে তার অ্যাপেও লাইভ দেখাবে",
-  sharedByLabel = "পাঠিয়েছেন",
-  sharedWithLabel = "শেয়ার করা হয়েছে",
-  noMarketListsTitle = "এখনও কোনো বাজার লিস্ট নেই",
-  noMarketListsBody = "নিজে ব্যবহার করতে বা আপনার স্ত্রী/পরিবারের ইমেইলে পাঠাতে নতুন বাজার লিস্ট তৈরি করুন।",
-  itemNameLabel = "পণ্যের নাম (যেমন: আলু, ডিম)",
-  itemQtyLabel = "পরিমাণ (যেমন: ২ কেজি)",
-  itemPriceOptionalLabel = "দাম (ঐচ্ছিক)",
-  addItemButton = "যোগ করুন",
-  boughtLabel = "কেনা হয়েছে",
-  remainingItemsLabel = "বাকি আছে",
-  estimatedTotalLabel = "মোট হিসাব",
-  logAsExpenseButton = "বাজার খরচ হিসেবে সেভ করুন",
-  markCompletedButton = "বাজার সম্পন্ন",
-  reopenListButton = "পুনরায় চালু করুন",
-  shareListTitle = "ইমেইলে লিস্ট পাঠান",
-  shareListButton = "শেয়ার আপডেট",
-  shareViaTextButton = "টেক্সট শেয়ার",
-  marketExpenseSaved = "বাজারের মোট খরচ হিসেবে সেভ হয়েছে!",
-  confirmDeleteMarketListTitle = "বাজার লিস্ট মুছে ফেলবেন?",
-  confirmDeleteMarketListMessage = "এই বাজার লিস্ট ও সব আইটেম স্থায়ীভাবে মুছে যাবে।",
-  editItemTitle = "আইটেম সম্পাদনা",
-  completedBadge = "সম্পন্ন",
-  activeBadge = "চলমান",
-  sharedListSavedMsg = "বাজার লিস্ট শেয়ার আপডেট হয়েছে",
-  splitByCategoryOption = "ক্যাটাগরি অনুযায়ী আলাদা সেভ করুন",
-  singleCategoryOption = "একটি ক্যাটাগরিতে মোট সেভ করুন",
-  marketSplitExpenseSaved = "ক্যাটাগরি অনুযায়ী সবগুলো খরচ সেভ হয়েছে!",
-  itemCategoryLabel = "ক্যাটাগরি",
-)
+object BengaliStrings : AppStrings {
+  override val appName = "হিসাব"
+  override val tagline = "আপনার দৈনন্দিন খরচের সহজ ও নিরাপদ সঙ্গী"
+  override val navExpenses = "খরচ"
+  override val navReports = "রিপোর্ট"
+  override val navBudgets = "বাজেট"
+  override val navSettings = "সেটিংস"
+  override val signInTitle = "হিসাব-এ স্বাগতম"
+  override val signInSubtitle = "বিজ্ঞাপন-মুক্ত দৈনন্দিন খরচের হিসাব, অফলাইন ব্যবহার, ক্লাউড সিঙ্ক এবং গুগল ড্রাইভ ব্যাকআপ একসাথে।"
+  override val signInWithGoogle = "Google দিয়ে সাইন ইন করুন"
+  override val adFreeBadge = "১০০% বিজ্ঞাপন মুক্ত"
+  override val featureOfflineTitle = "অফলাইন মোড"
+  override val featureOfflineDesc = "ইন্টারনেট ছাড়াই খরচ লিখুন ও দেখুন"
+  override val featureCloudTitle = "ক্লাউড সিঙ্ক"
+  override val featureCloudDesc = "সব ডিভাইসে স্বয়ংক্রিয়ভাবে ডাটা নিরাপদ থাকবে"
+  override val featureDriveTitle = "গুগল ড্রাইভ ব্যাকআপ"
+  override val featureDriveDesc = "এক ক্লিকে ড্রাইভে ব্যাকআপ ও রিস্টোর করুন"
+  override val onlineSynced = "অনলাইন • সিঙ্ক সম্পন্ন"
+  override val offlineModeActive = "অফলাইন মোড চালু"
+  override val offlineCached = "অফলাইন • লোকাল সেভ"
+  override val syncingPending = "সিঙ্ক হচ্ছে..."
+  override val thisMonthSpend = "এই মাসের মোট খরচ"
+  override val budgetRemaining = "বাজেট বাকি আছে"
+  override val budgetExceededBy = "বাজেট অতিক্রম করেছে"
+  override val setBudgetHint = "মাসিক বাজেট সেট করুন"
+  override val dailyAllowance = "দৈনিক গড় বরাদ্দ"
+  override val today = "আজ"
+  override val yesterday = "গতকাল"
+  override val allCategories = "সব বিভাগ"
+  override val searchExpenses = "খরচ খুঁজুন..."
+  override val addExpense = "নতুন খরচ যোগ করুন"
+  override val editExpense = "খরচ সম্পাদনা করুন"
+  override val expenseTitleLabel = "খরচের বিবরণ (যেমন: দুপুরের খাবার)"
+  override val amountLabel = "পরিমাণ"
+  override val categoryLabel = "বিভাগ নির্বাচন করুন"
+  override val paymentMethodLabel = "পেমেন্ট মাধ্যম"
+  override val dateLabel = "তারিখ"
+  override val noteOptionalLabel = "নোট (ঐচ্ছিক)"
+  override val save = "সংরক্ষণ করুন"
+  override val cancel = "বাতিল"
+  override val delete = "মুছে ফেলুন"
+  override val confirmDeleteTitle = "খরচটি মুছে ফেলবেন?"
+  override val confirmDeleteMessage = "এই খরচের রেকর্ডটি স্থায়ীভাবে মুছে যাবে।"
+  override val emptyExpensesTitle = "এখনও কোনো খরচ লেখা হয়নি"
+  override val emptyExpensesBody = "নিচের '+' বোতামে ট্যাপ করে আপনার প্রথম দৈনন্দিন খরচ যোগ করুন।"
+  override val addCustomCategory = "নতুন বিভাগ"
+  override val customCategoryName = "বিভাগের নাম"
+  override val chooseColor = "রঙ বাছাই করুন"
+  override val chooseIcon = "আইকন বাছাই করুন"
+  override val cash = "নগদ"
+  override val card = "কার্ড"
+  override val mobileBanking = "মোবাইল ব্যাংকিং"
+  override val bank = "ব্যাংক"
+  override val monthlyReportTitle = "মাসিক রিপোর্ট"
+  override val totalSpent = "মোট খরচ"
+  override val dailyAverage = "দৈনিক গড়"
+  override val transactionsCount = "মোট লেনদেন"
+  override val topCategory = "সর্বোচ্চ বিভাগ"
+  override val vsPrevMonth = "আগের মাসের তুলনায়"
+  override val categoryChartTitle = "বিভাগ অনুযায়ী খরচের চিত্র"
+  override val dailyTrendTitle = "দৈনিক খরচের গ্রাফ"
+  override val sixMonthChartTitle = "গত ৬ মাসের তুলনামূলক চিত্র"
+  override val categoryBreakdown = "বিভাগভিত্তিক বিস্তারিত"
+  override val tapBarHint = "বিস্তারিত দেখতে যেকোনো বার বা অংশে ট্যাপ করুন"
+  override val noDataForMonth = "এই মাসে কোনো খরচের ডাটা নেই"
+  override val budgetSettingsTitle = "বাজেট ও রিমাইন্ডার"
+  override val monthlyBudgetLimit = "মাসিক মোট বাজেট"
+  override val categoryBudgetsTitle = "বিভাগ অনুযায়ী বাজেট"
+  override val saveBudget = "বাজেট সংরক্ষণ করুন"
+  override val budgetSaved = "বাজেট সফলভাবে সংরক্ষিত হয়েছে"
+  override val spentOf = "খরচ হয়েছে /"
+  override val reminderSettingsTitle = "নোটিফিকেশন রিমাইন্ডার"
+  override val dailyReminderLabel = "দৈনিক খরচ লেখার রিমাইন্ডার"
+  override val dailyReminderDesc = "প্রতিদিন নির্দিষ্ট সময়ে আপনাকে মনে করিয়ে দেবে"
+  override val reminderTimeLabel = "রিমাইন্ডার সময়"
+  override val budgetAlertsLabel = "বাজেট সতর্কতা নোটিফিকেশন"
+  override val budgetAlertsDesc = "বাজেটের ৮০% বা ১০০% পার হলে সতর্ক করবে"
+  override val notificationPermNeeded = "রিমাইন্ডার পেতে নোটিফিকেশন অনুমতি দিন"
+  override val grantPermission = "অনুমতি দিন"
+  override val settingsTitle = "সেটিংস ও ব্যাকআপ"
+  override val accountSection = "অ্যাকাউন্ট"
+  override val signOut = "সাইন আউট"
+  override val syncSection = "ক্লাউড সিঙ্ক ও অফলাইন মোড"
+  override val cloudSyncToggle = "অটো ক্লাউড সিঙ্ক"
+  override val cloudSyncDesc = "বন্ধ করলে অ্যাপটি সম্পূর্ণ অফলাইন মোডে চলবে"
+  override val driveBackupSection = "গুগল ড্রাইভ ব্যাকআপ"
+  override val backUpToDrive = "গুগল ড্রাইভে ব্যাকআপ নিন"
+  override val restoreFromDrive = "গুগল ড্রাইভ থেকে রিস্টোর করুন"
+  override val lastDriveBackup = "সর্বশেষ ড্রাইভ ব্যাকআপ"
+  override val neverBackedUp = "এখনও ব্যাকআপ নেওয়া হয়নি"
+  override val driveBackupSuccess = "গুগল ড্রাইভে ব্যাকআপ সফল হয়েছে!"
+  override val driveRestoreSuccess = "গুগল ড্রাইভ থেকে ডাটা রিস্টোর হয়েছে!"
+  override val chooseBackupTitle = "রিস্টোর করার জন্য ব্যাকআপ বেছে নিন"
+  override val noDriveBackups = "গুগল ড্রাইভে কোনো ব্যাকআপ পাওয়া যায়নি"
+  override val localExportSection = "ডাটা এক্সপোর্ট ও লোকাল ব্যাকআপ"
+  override val exportCsv = "CSV এক্সপোর্ট (Excel)"
+  override val exportJson = "JSON ব্যাকআপ সেভ করুন"
+  override val importJson = "JSON ব্যাকআপ ইমপোর্ট করুন"
+  override val exportSuccess = "ফাইল সফলভাবে এক্সপোর্ট হয়েছে"
+  override val importSuccess = "ব্যাকআপ ডাটা সফলভাবে ইমপোর্ট হয়েছে"
+  override val securitySection = "পাসওয়ার্ড / পিন সুরক্ষা"
+  override val pinLockToggle = "অ্যাপ পিন লক চালু করুন"
+  override val pinLockDesc = "অ্যাপ খোলার সময় ৪-সংখ্যার পিন চাইবে"
+  override val changePin = "পিন পরিবর্তন করুন"
+  override val lockOnBackground = "ব্যাকগ্রাউন্ডে গেলে লক করুন"
+  override val enterPinTitle = "অ্যাপ আনলক করতে পিন দিন"
+  override val createPinTitle = "নতুন ৪-সংখ্যার পিন সেট করুন"
+  override val confirmPinTitle = "পিনটি পুনরায় নিশ্চিত করুন"
+  override val pinMismatch = "পিন মেলেনি, আবার চেষ্টা করুন"
+  override val wrongPin = "ভুল পিন! আবার চেষ্টা করুন"
+  override val pinSaved = "পিন সুরক্ষা সক্রিয় হয়েছে"
+  override val appearanceSection = "থিম ও ডার্ক মোড"
+  override val themeModeLabel = "ডিসপ্লে মোড"
+  override val themeSystem = "সিস্টেম"
+  override val themeLight = "লাইট"
+  override val themeDark = "ডার্ক"
+  override val themePaletteLabel = "কাস্টম রঙের থিম"
+  override val languageCurrencySection = "ভাষা ও মুদ্রা"
+  override val languageLabel = "অ্যাপের ভাষা"
+  override val currencyLabel = "মুদ্রা (Currency)"
+  override val customCategoriesSection = "কাস্টম বিভাগসমূহ"
+  override val adFreeNotice = "হিসাব সম্পূর্ণ বিজ্ঞাপন-মুক্ত এবং আপনার ডাটা শুধুমাত্র আপনার নিয়ন্ত্রণে থাকে।"
+  override val invalidInputError = "অনুগ্রহ করে সঠিক বিবরণ ও ০-এর বেশি পরিমাণ লিখুন"
+  override val catFood = "খাবার"
+  override val catTransport = "যাতায়াত"
+  override val catGroceries = "বাজার"
+  override val catUtilities = "বিল ও ইউটিলিটি"
+  override val catShopping = "কেনাকাটা"
+  override val catHealth = "স্বাস্থ্য"
+  override val catEducation = "শিক্ষা"
+  override val catEntertainment = "বিনোদন"
+  override val catFamily = "পরিবার ও উপহার"
+  override val catOther = "অন্যান্য"
+  override val budgetAlert80Title = "বাজেট সতর্কতা (৮০%+)"
+  override val budgetAlert100Title = "বাজেট সীমা অতিক্রম!"
+  override val reminderNotificationTitle = "আজকের খরচের হিসাব লিখেছেন?"
+  override val reminderNotificationBody = "হিসাব অ্যাপে আজকের খরচগুলো যোগ করতে ভুলবেন না।"
+  override val themeEmerald = "এমেরাল্ড"
+  override val themeIndigo = "ইন্ডিগো"
+  override val themeTerracotta = "টেরাকোটা"
+  override val themeOcean = "ওশান"
+  override val themePlum = "প্লাম"
+  override val remainingBalance = "অবশিষ্ট ব্যালেন্স"
+  override val addedBalance = "মোট ব্যালেন্স যোগ"
+  override val addBalance = "ব্যালেন্স যোগ করুন"
+  override val editBalance = "ব্যালেন্স সম্পাদনা করুন"
+  override val balanceTitleLabel = "ব্যালেন্সের উৎস (যেমন: বেতন, ক্যাশ জমা)"
+  override val balanceFilterChip = "ব্যালেন্স (+)"
+  override val expenseTypeTab = "খরচ (-)"
+  override val balanceTypeTab = "ব্যালেন্স (+)"
+  override val receiveMethodLabel = "জমার মাধ্যম"
+  override val confirmDeleteBalanceTitle = "ব্যালেন্স এন্ট্রি মুছে ফেলবেন?"
+  override val confirmDeleteBalanceMessage = "এই ব্যালেন্স জমার রেকর্ডটি স্থায়ীভাবে মুছে যাবে।"
+  override val overallWalletBalance = "সর্বমোট ওয়ালেট ব্যালেন্স"
+  override val entryTypeExpense = "খরচ"
+  override val entryTypeIncome = "ব্যালেন্স"
+  override val navWallets = "ওয়ালেট"
+  override val transferTypeTab = "ট্রান্সফার"
+  override val borrowTypeTab = "ধার (+)"
+  override val addTransfer = "অ্যাকাউন্ট ট্রান্সফার"
+  override val editTransfer = "ট্রান্সফার সম্পাদনা"
+  override val fromAccountLabel = "যে অ্যাকাউন্ট থেকে (From)"
+  override val toAccountLabel = "যে অ্যাকাউন্টে যাবে (To)"
+  override val sameAccountTransferError = "প্রেরক ও প্রাপক অ্যাকাউন্ট আলাদা হতে হবে"
+  override val addBorrow = "ধার গ্রহণ (Payable)"
+  override val editBorrow = "ধারের হিসাব সম্পাদনা"
+  override val lenderNameLabel = "যার থেকে ধার নিলেন (নাম)"
+  override val borrowAutoPayableHint = "এই টাকা নির্বাচিত অ্যাকাউন্টে যোগ হবে এবং স্বয়ংক্রিয়ভাবে পাওনাদার (Payable) তৈরি হবে।"
+  override val transferFilterChip = "ট্রান্সফার (⇄)"
+  override val payableFilterChip = "ধার / দেনা"
+  override val walletsScreenTitle = "ওয়ালেট ও দেনা"
+  override val accountBalancesTitle = "অ্যাকাউন্ট অনুযায়ী ব্যালেন্স"
+  override val totalPayablesLabel = "মোট দেনা (Payable)"
+  override val unpaidPayablesTitle = "বাকি দেনা (Payables)"
+  override val settledPayablesTitle = "পরিশোধিত দেনা"
+  override val noPayablesEmpty = "কোনো বাকি দেনা নেই"
+  override val repayButton = "শোধ করুন"
+  override val repayPayableTitle = "দেনা পরিশোধ করুন"
+  override val paidFromAccountLabel = "যে অ্যাকাউন্ট থেকে পরিশোধ"
+  override val paidAmountLabel = "পরিশোধিত"
+  override val dueAmountLabel = "বাকি আছে"
+  override val settledBadge = "পরিশোধিত"
+  override val repaymentHistoryTitle = "পরিশোধের ইতিহাস"
+  override val transferHistoryTitle = "অ্যাকাউন্ট ট্রান্সফারসমূহ"
+  override val quickTransferAction = "ট্রান্সফার"
+  override val quickBorrowAction = "ধার (+)"
+  override val confirmDeleteTransferTitle = "ট্রান্সফার মুছে ফেলবেন?"
+  override val confirmDeleteTransferMessage = "এই ট্রান্সফার রেকর্ডটি স্থায়ীভাবে মুছে যাবে এবং অ্যাকাউন্ট ব্যালেন্স আপডেট হবে।"
+  override val confirmDeletePayableTitle = "দেনার রেকর্ড মুছে ফেলবেন?"
+  override val confirmDeletePayableMessage = "এই ধারের রেকর্ড ও এর সব পরিশোধের তথ্য স্থায়ীভাবে মুছে যাবে।"
+  override val confirmDeleteRepaymentTitle = "পরিশোধ মুছে ফেলবেন?"
+  override val confirmDeleteRepaymentMessage = "এই পরিশোধ মুছে ফেললে দেনার বাকি পরিমাণ আবার বেড়ে যাবে।"
+  override val entryTypeTransfer = "ট্রান্সফার"
+  override val entryTypeBorrow = "ধার (Payable)"
+  override val entryTypeRepayment = "দেনা শোধ"
+  override val walletCashLabel = "নগদ (ওয়ালেট)"
+  override val lendTypeTab = "ধার দেওয়া"
+  override val addLend = "ধার দেওয়া (পাওনা)"
+  override val editLend = "পাওনা সম্পাদনা"
+  override val borrowerNameLabel = "যাকে ধার দিলেন (নাম)"
+  override val lendAutoReceivableHint = "এই টাকা নির্বাচিত অ্যাকাউন্ট থেকে কমবে এবং স্বয়ংক্রিয়ভাবে আপনার পাওনা (Receivable) হিসেবে যুক্ত হবে।"
+  override val lendFromAccountLabel = "যে অ্যাকাউন্ট থেকে দিলেন"
+  override val receivableFilterChip = "পাওনা (ধার দেওয়া)"
+  override val totalReceivablesLabel = "মোট পাওনা (Receivable)"
+  override val unpaidReceivablesTitle = "বাকি পাওনা (Receivables)"
+  override val settledReceivablesTitle = "আদায়কৃত পাওনা"
+  override val noReceivablesEmpty = "কোনো বাকি পাওনা নেই"
+  override val collectButton = "আদায় করুন"
+  override val collectReceivableTitle = "পাওনা আদায় করুন"
+  override val collectedToAccountLabel = "যে অ্যাকাউন্টে পেলেন"
+  override val collectedAmountLabel = "আদায় হয়েছে"
+  override val collectionHistoryTitle = "আদায়ের ইতিহাস"
+  override val quickLendAction = "ধার দেওয়া (-)"
+  override val confirmDeleteReceivableTitle = "পাওনার রেকর্ড মুছে ফেলবেন?"
+  override val confirmDeleteReceivableMessage = "এই পাওনা ও এর সব আদায়ের তথ্য স্থায়ীভাবে মুছে যাবে।"
+  override val confirmDeleteCollectionTitle = "আদায় মুছে ফেলবেন?"
+  override val confirmDeleteCollectionMessage = "এই আদায় মুছে ফেললে পাওনার বাকি পরিমাণ আবার বেড়ে যাবে।"
+  override val entryTypeLend = "ধার দেওয়া (পাওনা)"
+  override val entryTypeCollection = "পাওনা আদায়"
+  override val payablesTab = "দেনা (নিয়েছি)"
+  override val receivablesTab = "পাওনা (দিয়েছি)"
+  override val marketListTitle = "বাজার লিস্ট"
+  override val marketCardTitle = "বাজার লিস্ট ও শেয়ার"
+  override val marketCardSubtitle = "নতুন বাজার লিস্ট বানান বা ইমেইলে পাঠান"
+  override val marketNewListButton = "নতুন লিস্ট"
+  override val marketListNameLabel = "লিস্টের নাম (যেমন: আজকের বাজার)"
+  override val shareWithEmailLabel = "যার ইমেইলে পাঠাবেন (ঐচ্ছিক)"
+  override val shareWithEmailHint = "যেমন: wife@gmail.com — দিলে তার অ্যাপেও লাইভ দেখাবে"
+  override val sharedByLabel = "পাঠিয়েছেন"
+  override val sharedWithLabel = "শেয়ার করা হয়েছে"
+  override val noMarketListsTitle = "এখনও কোনো বাজার লিস্ট নেই"
+  override val noMarketListsBody = "নিজে ব্যবহার করতে বা আপনার স্ত্রী/পরিবারের ইমেইলে পাঠাতে নতুন বাজার লিস্ট তৈরি করুন।"
+  override val itemNameLabel = "পণ্যের নাম (যেমন: আলু, ডিম)"
+  override val itemQtyLabel = "পরিমাণ (যেমন: ২ কেজি)"
+  override val itemPriceOptionalLabel = "দাম (ঐচ্ছিক)"
+  override val addItemButton = "যোগ করুন"
+  override val boughtLabel = "কেনা হয়েছে"
+  override val remainingItemsLabel = "বাকি আছে"
+  override val estimatedTotalLabel = "মোট হিসাব"
+  override val logAsExpenseButton = "বাজার খরচ হিসেবে সেভ করুন"
+  override val markCompletedButton = "বাজার সম্পন্ন"
+  override val reopenListButton = "পুনরায় চালু করুন"
+  override val shareListTitle = "ইমেইলে লিস্ট পাঠান"
+  override val shareListButton = "শেয়ার আপডেট"
+  override val shareViaTextButton = "টেক্সট শেয়ার"
+  override val marketExpenseSaved = "বাজারের মোট খরচ হিসেবে সেভ হয়েছে!"
+  override val confirmDeleteMarketListTitle = "বাজার লিস্ট মুছে ফেলবেন?"
+  override val confirmDeleteMarketListMessage = "এই বাজার লিস্ট ও সব আইটেম স্থায়ীভাবে মুছে যাবে।"
+  override val editItemTitle = "আইটেম সম্পাদনা"
+  override val completedBadge = "সম্পন্ন"
+  override val activeBadge = "চলমান"
+  override val sharedListSavedMsg = "বাজার লিস্ট শেয়ার আপডেট হয়েছে"
+  override val splitByCategoryOption = "ক্যাটাগরি অনুযায়ী আলাদা সেভ করুন"
+  override val singleCategoryOption = "একটি ক্যাটাগরিতে মোট সেভ করুন"
+  override val marketSplitExpenseSaved = "ক্যাটাগরি অনুযায়ী সবগুলো খরচ সেভ হয়েছে!"
+  override val itemCategoryLabel = "ক্যাটাগরি"
+}
 
-val EnglishStrings = AppStrings(
-  appName = "Hisab",
-  tagline = "Simple, ad-free daily expense companion",
-  navExpenses = "Expenses",
-  navReports = "Reports",
-  navBudgets = "Budgets",
-  navSettings = "Settings",
-  signInTitle = "Welcome to Hisab",
-  signInSubtitle = "Ad-free daily expense tracking with offline resilience, cloud sync, PIN lock, and Google Drive backup.",
-  signInWithGoogle = "Sign in with Google",
-  adFreeBadge = "100% Ad-Free",
-  featureOfflineTitle = "Offline Ready",
-  featureOfflineDesc = "Log & view expenses even without internet",
-  featureCloudTitle = "Cloud Sync",
-  featureCloudDesc = "Automatically synced across your devices",
-  featureDriveTitle = "Google Drive Backup",
-  featureDriveDesc = "One-tap encrypted JSON backup & restore",
-  onlineSynced = "Online • Synced",
-  offlineModeActive = "Offline Mode On",
-  offlineCached = "Offline • Cached Locally",
-  syncingPending = "Syncing changes...",
-  thisMonthSpend = "Spent This Month",
-  budgetRemaining = "Remaining Budget",
-  budgetExceededBy = "Over Budget By",
-  setBudgetHint = "Set a monthly budget",
-  dailyAllowance = "Daily Allowance",
-  today = "Today",
-  yesterday = "Yesterday",
-  allCategories = "All",
-  searchExpenses = "Search expenses...",
-  addExpense = "Add Expense",
-  editExpense = "Edit Expense",
-  expenseTitleLabel = "Description (e.g., Lunch, Groceries)",
-  amountLabel = "Amount",
-  categoryLabel = "Select Category",
-  paymentMethodLabel = "Payment Method",
-  dateLabel = "Date",
-  noteOptionalLabel = "Note (optional)",
-  save = "Save",
-  cancel = "Cancel",
-  delete = "Delete",
-  confirmDeleteTitle = "Delete Expense?",
-  confirmDeleteMessage = "This expense record will be permanently removed.",
-  emptyExpensesTitle = "No expenses recorded yet",
-  emptyExpensesBody = "Tap the '+' button below to log your first daily expense.",
-  addCustomCategory = "New Category",
-  customCategoryName = "Category Name",
-  chooseColor = "Choose Color",
-  chooseIcon = "Choose Icon",
-  cash = "Cash",
-  card = "Card",
-  mobileBanking = "Mobile Pay",
-  bank = "Bank",
-  monthlyReportTitle = "Monthly Report",
-  totalSpent = "Total Spent",
-  dailyAverage = "Daily Average",
-  transactionsCount = "Transactions",
-  topCategory = "Top Category",
-  vsPrevMonth = "vs last month",
-  categoryChartTitle = "Spending by Category",
-  dailyTrendTitle = "Daily Spending Trend",
-  sixMonthChartTitle = "6-Month Comparison",
-  categoryBreakdown = "Category Breakdown",
-  tapBarHint = "Tap any slice or bar to inspect details",
-  noDataForMonth = "No expenses logged for this month",
-  budgetSettingsTitle = "Budgets & Reminders",
-  monthlyBudgetLimit = "Monthly Total Budget",
-  categoryBudgetsTitle = "Category Budgets",
-  saveBudget = "Save Budget",
-  budgetSaved = "Budget saved successfully",
-  spentOf = "spent of",
-  reminderSettingsTitle = "Notification Reminders",
-  dailyReminderLabel = "Daily Expense Reminder",
-  dailyReminderDesc = "Get a gentle daily reminder to log expenses",
-  reminderTimeLabel = "Reminder Time",
-  budgetAlertsLabel = "Budget Threshold Alerts",
-  budgetAlertsDesc = "Notify when spending crosses 80% or 100%",
-  notificationPermNeeded = "Notification permission required for reminders",
-  grantPermission = "Allow",
-  settingsTitle = "Settings & Backup",
-  accountSection = "Account",
-  signOut = "Sign Out",
-  syncSection = "Cloud Sync & Offline Mode",
-  cloudSyncToggle = "Auto Cloud Sync",
-  cloudSyncDesc = "Turn off to run strictly in offline mode",
-  driveBackupSection = "Google Drive Backup",
-  backUpToDrive = "Back Up to Google Drive",
-  restoreFromDrive = "Restore from Google Drive",
-  lastDriveBackup = "Last Drive Backup",
-  neverBackedUp = "Not backed up yet",
-  driveBackupSuccess = "Backed up to Google Drive!",
-  driveRestoreSuccess = "Restored from Google Drive!",
-  chooseBackupTitle = "Select Backup to Restore",
-  noDriveBackups = "No Hisab backups found on Google Drive",
-  localExportSection = "Export & Local Backup",
-  exportCsv = "Export CSV (Excel)",
-  exportJson = "Save JSON Backup",
-  importJson = "Import JSON Backup",
-  exportSuccess = "Exported successfully",
-  importSuccess = "Backup imported successfully",
-  securitySection = "PIN Security",
-  pinLockToggle = "Enable PIN Lock",
-  pinLockDesc = "Require a 4-digit PIN to unlock Hisab",
-  changePin = "Change PIN",
-  lockOnBackground = "Lock when app goes to background",
-  enterPinTitle = "Enter PIN to Unlock",
-  createPinTitle = "Create a 4-Digit PIN",
-  confirmPinTitle = "Confirm Your PIN",
-  pinMismatch = "PINs did not match, try again",
-  wrongPin = "Incorrect PIN, please try again",
-  pinSaved = "PIN protection enabled",
-  appearanceSection = "Theme & Dark Mode",
-  themeModeLabel = "Appearance",
-  themeSystem = "System",
-  themeLight = "Light",
-  themeDark = "Dark",
-  themePaletteLabel = "Custom Color Theme",
-  languageCurrencySection = "Language & Currency",
-  languageLabel = "Language",
-  currencyLabel = "Currency",
-  customCategoriesSection = "Custom Categories",
-  adFreeNotice = "Hisab is 100% ad-free and keeps your financial data private under your own account.",
-  invalidInputError = "Please enter a valid title and positive amount",
-  catFood = "Food",
-  catTransport = "Transport",
-  catGroceries = "Groceries",
-  catUtilities = "Bills & Utilities",
-  catShopping = "Shopping",
-  catHealth = "Health",
-  catEducation = "Education",
-  catEntertainment = "Entertainment",
-  catFamily = "Family & Gifts",
-  catOther = "Other",
-  budgetAlert80Title = "Budget Warning (80%+)",
-  budgetAlert100Title = "Budget Limit Reached!",
-  reminderNotificationTitle = "Logged today's expenses?",
-  reminderNotificationBody = "Take a moment to record your daily spending in Hisab.",
-  themeEmerald = "Emerald",
-  themeIndigo = "Indigo",
-  themeTerracotta = "Terracotta",
-  themeOcean = "Ocean",
-  themePlum = "Plum",
-  remainingBalance = "Remaining Balance",
-  addedBalance = "Added Balance",
-  addBalance = "Add Balance",
-  editBalance = "Edit Balance",
-  balanceTitleLabel = "Source (e.g., Salary, Wallet Top-up)",
-  balanceFilterChip = "Deposits (+)",
-  expenseTypeTab = "Expense (-)",
-  balanceTypeTab = "Balance (+)",
-  receiveMethodLabel = "Deposit Channel",
-  confirmDeleteBalanceTitle = "Delete Balance Entry?",
-  confirmDeleteBalanceMessage = "This balance deposit record will be permanently removed.",
-  overallWalletBalance = "Overall Wallet Balance",
-  entryTypeExpense = "Expense",
-  entryTypeIncome = "Balance",
-  navWallets = "Wallets",
-  transferTypeTab = "Transfer",
-  borrowTypeTab = "Borrow",
-  addTransfer = "Transfer Funds",
-  editTransfer = "Edit Transfer",
-  fromAccountLabel = "From Account",
-  toAccountLabel = "To Account",
-  sameAccountTransferError = "From and To accounts must be different",
-  addBorrow = "Borrow Money (Payable)",
-  editBorrow = "Edit Payable",
-  lenderNameLabel = "Borrowed From (Person Name)",
-  borrowAutoPayableHint = "Amount will be added to the selected account and a Payable for this person will be created automatically.",
-  transferFilterChip = "Transfers",
-  payableFilterChip = "Payables",
-  walletsScreenTitle = "Wallets & Payables",
-  accountBalancesTitle = "Account Balances",
-  totalPayablesLabel = "Total Payables",
-  unpaidPayablesTitle = "Unpaid Payables",
-  settledPayablesTitle = "Settled Payables",
-  noPayablesEmpty = "No active payables",
-  repayButton = "Pay",
-  repayPayableTitle = "Repay Payable",
-  paidFromAccountLabel = "Pay From Account",
-  paidAmountLabel = "Paid",
-  dueAmountLabel = "Due",
-  settledBadge = "Settled",
-  repaymentHistoryTitle = "Repayment History",
-  transferHistoryTitle = "Account Transfers",
-  quickTransferAction = "Transfer",
-  quickBorrowAction = "Borrow (+)",
-  confirmDeleteTransferTitle = "Delete Transfer?",
-  confirmDeleteTransferMessage = "This transfer record will be removed and account balances adjusted.",
-  confirmDeletePayableTitle = "Delete Payable?",
-  confirmDeletePayableMessage = "This payable and its repayment history will be permanently removed.",
-  confirmDeleteRepaymentTitle = "Delete Repayment?",
-  confirmDeleteRepaymentMessage = "Removing this repayment will restore the due balance.",
-  entryTypeTransfer = "Transfer",
-  entryTypeBorrow = "Borrowed",
-  entryTypeRepayment = "Loan Paid",
-  walletCashLabel = "Cash (Wallet)",
-  lendTypeTab = "Lend (-)",
-  addLend = "Lend Money (Receivable)",
-  editLend = "Edit Receivable",
-  borrowerNameLabel = "Lent To (Person Name)",
-  lendAutoReceivableHint = "Amount will be deducted from the selected account and a Receivable for this person will be created automatically.",
-  lendFromAccountLabel = "Lent From Account",
-  receivableFilterChip = "Receivables",
-  totalReceivablesLabel = "Total Receivables",
-  unpaidReceivablesTitle = "Pending Receivables",
-  settledReceivablesTitle = "Collected Receivables",
-  noReceivablesEmpty = "No pending receivables",
-  collectButton = "Collect",
-  collectReceivableTitle = "Collect Receivable",
-  collectedToAccountLabel = "Received Into Account",
-  collectedAmountLabel = "Collected",
-  collectionHistoryTitle = "Collection History",
-  quickLendAction = "Lend (-)",
-  confirmDeleteReceivableTitle = "Delete Receivable?",
-  confirmDeleteReceivableMessage = "This receivable and its collection history will be permanently removed.",
-  confirmDeleteCollectionTitle = "Delete Collection?",
-  confirmDeleteCollectionMessage = "Removing this collection will restore the due receivable balance.",
-  entryTypeLend = "Lent Money",
-  entryTypeCollection = "Loan Collected",
-  payablesTab = "Payables (Borrowed)",
-  receivablesTab = "Receivables (Lent)",
-  marketListTitle = "Market List",
-  marketCardTitle = "Bazaar & Grocery List",
-  marketCardSubtitle = "Create a checklist or share live with family by email",
-  marketNewListButton = "New List",
-  marketListNameLabel = "List title (e.g., Weekly Bazaar)",
-  shareWithEmailLabel = "Send to Email (optional)",
-  shareWithEmailHint = "e.g., partner@gmail.com — syncs live to their phone",
-  sharedByLabel = "From",
-  sharedWithLabel = "Shared with",
-  noMarketListsTitle = "No market lists yet",
-  noMarketListsBody = "Create a grocery checklist or send one to your spouse's email so they can shop live.",
-  itemNameLabel = "Item name (e.g., Rice, Eggs)",
-  itemQtyLabel = "Qty (e.g., 2 kg)",
-  itemPriceOptionalLabel = "Price (optional)",
-  addItemButton = "Add Item",
-  boughtLabel = "Bought",
-  remainingItemsLabel = "Remaining",
-  estimatedTotalLabel = "Estimated Total",
-  logAsExpenseButton = "Save as Bazaar Expense",
-  markCompletedButton = "Finish Shopping",
-  reopenListButton = "Reopen List",
-  shareListTitle = "Send List by Email",
-  shareListButton = "Update Share",
-  shareViaTextButton = "Share Text",
-  marketExpenseSaved = "Saved market total as expense!",
-  confirmDeleteMarketListTitle = "Delete Market List?",
-  confirmDeleteMarketListMessage = "This market list and all its items will be permanently removed.",
-  editItemTitle = "Edit Item",
-  completedBadge = "Done",
-  activeBadge = "Active",
-  sharedListSavedMsg = "Market list sharing updated",
-  splitByCategoryOption = "Split into separate category expenses",
-  singleCategoryOption = "Save total under one category",
-  marketSplitExpenseSaved = "Saved expenses across categories!",
-  itemCategoryLabel = "Category",
-)
+object EnglishStrings : AppStrings {
+  override val appName = "Hisab"
+  override val tagline = "Simple, ad-free daily expense companion"
+  override val navExpenses = "Expenses"
+  override val navReports = "Reports"
+  override val navBudgets = "Budgets"
+  override val navSettings = "Settings"
+  override val signInTitle = "Welcome to Hisab"
+  override val signInSubtitle = "Ad-free daily expense tracking with offline resilience, cloud sync, PIN lock, and Google Drive backup."
+  override val signInWithGoogle = "Sign in with Google"
+  override val adFreeBadge = "100% Ad-Free"
+  override val featureOfflineTitle = "Offline Ready"
+  override val featureOfflineDesc = "Log & view expenses even without internet"
+  override val featureCloudTitle = "Cloud Sync"
+  override val featureCloudDesc = "Automatically synced across your devices"
+  override val featureDriveTitle = "Google Drive Backup"
+  override val featureDriveDesc = "One-tap encrypted JSON backup & restore"
+  override val onlineSynced = "Online • Synced"
+  override val offlineModeActive = "Offline Mode On"
+  override val offlineCached = "Offline • Cached Locally"
+  override val syncingPending = "Syncing changes..."
+  override val thisMonthSpend = "Spent This Month"
+  override val budgetRemaining = "Remaining Budget"
+  override val budgetExceededBy = "Over Budget By"
+  override val setBudgetHint = "Set a monthly budget"
+  override val dailyAllowance = "Daily Allowance"
+  override val today = "Today"
+  override val yesterday = "Yesterday"
+  override val allCategories = "All"
+  override val searchExpenses = "Search expenses..."
+  override val addExpense = "Add Expense"
+  override val editExpense = "Edit Expense"
+  override val expenseTitleLabel = "Description (e.g., Lunch, Groceries)"
+  override val amountLabel = "Amount"
+  override val categoryLabel = "Select Category"
+  override val paymentMethodLabel = "Payment Method"
+  override val dateLabel = "Date"
+  override val noteOptionalLabel = "Note (optional)"
+  override val save = "Save"
+  override val cancel = "Cancel"
+  override val delete = "Delete"
+  override val confirmDeleteTitle = "Delete Expense?"
+  override val confirmDeleteMessage = "This expense record will be permanently removed."
+  override val emptyExpensesTitle = "No expenses recorded yet"
+  override val emptyExpensesBody = "Tap the '+' button below to log your first daily expense."
+  override val addCustomCategory = "New Category"
+  override val customCategoryName = "Category Name"
+  override val chooseColor = "Choose Color"
+  override val chooseIcon = "Choose Icon"
+  override val cash = "Cash"
+  override val card = "Card"
+  override val mobileBanking = "Mobile Pay"
+  override val bank = "Bank"
+  override val monthlyReportTitle = "Monthly Report"
+  override val totalSpent = "Total Spent"
+  override val dailyAverage = "Daily Average"
+  override val transactionsCount = "Transactions"
+  override val topCategory = "Top Category"
+  override val vsPrevMonth = "vs last month"
+  override val categoryChartTitle = "Spending by Category"
+  override val dailyTrendTitle = "Daily Spending Trend"
+  override val sixMonthChartTitle = "6-Month Comparison"
+  override val categoryBreakdown = "Category Breakdown"
+  override val tapBarHint = "Tap any slice or bar to inspect details"
+  override val noDataForMonth = "No expenses logged for this month"
+  override val budgetSettingsTitle = "Budgets & Reminders"
+  override val monthlyBudgetLimit = "Monthly Total Budget"
+  override val categoryBudgetsTitle = "Category Budgets"
+  override val saveBudget = "Save Budget"
+  override val budgetSaved = "Budget saved successfully"
+  override val spentOf = "spent of"
+  override val reminderSettingsTitle = "Notification Reminders"
+  override val dailyReminderLabel = "Daily Expense Reminder"
+  override val dailyReminderDesc = "Get a gentle daily reminder to log expenses"
+  override val reminderTimeLabel = "Reminder Time"
+  override val budgetAlertsLabel = "Budget Threshold Alerts"
+  override val budgetAlertsDesc = "Notify when spending crosses 80% or 100%"
+  override val notificationPermNeeded = "Notification permission required for reminders"
+  override val grantPermission = "Allow"
+  override val settingsTitle = "Settings & Backup"
+  override val accountSection = "Account"
+  override val signOut = "Sign Out"
+  override val syncSection = "Cloud Sync & Offline Mode"
+  override val cloudSyncToggle = "Auto Cloud Sync"
+  override val cloudSyncDesc = "Turn off to run strictly in offline mode"
+  override val driveBackupSection = "Google Drive Backup"
+  override val backUpToDrive = "Back Up to Google Drive"
+  override val restoreFromDrive = "Restore from Google Drive"
+  override val lastDriveBackup = "Last Drive Backup"
+  override val neverBackedUp = "Not backed up yet"
+  override val driveBackupSuccess = "Backed up to Google Drive!"
+  override val driveRestoreSuccess = "Restored from Google Drive!"
+  override val chooseBackupTitle = "Select Backup to Restore"
+  override val noDriveBackups = "No Hisab backups found on Google Drive"
+  override val localExportSection = "Export & Local Backup"
+  override val exportCsv = "Export CSV (Excel)"
+  override val exportJson = "Save JSON Backup"
+  override val importJson = "Import JSON Backup"
+  override val exportSuccess = "Exported successfully"
+  override val importSuccess = "Backup imported successfully"
+  override val securitySection = "PIN Security"
+  override val pinLockToggle = "Enable PIN Lock"
+  override val pinLockDesc = "Require a 4-digit PIN to unlock Hisab"
+  override val changePin = "Change PIN"
+  override val lockOnBackground = "Lock when app goes to background"
+  override val enterPinTitle = "Enter PIN to Unlock"
+  override val createPinTitle = "Create a 4-Digit PIN"
+  override val confirmPinTitle = "Confirm Your PIN"
+  override val pinMismatch = "PINs did not match, try again"
+  override val wrongPin = "Incorrect PIN, please try again"
+  override val pinSaved = "PIN protection enabled"
+  override val appearanceSection = "Theme & Dark Mode"
+  override val themeModeLabel = "Appearance"
+  override val themeSystem = "System"
+  override val themeLight = "Light"
+  override val themeDark = "Dark"
+  override val themePaletteLabel = "Custom Color Theme"
+  override val languageCurrencySection = "Language & Currency"
+  override val languageLabel = "Language"
+  override val currencyLabel = "Currency"
+  override val customCategoriesSection = "Custom Categories"
+  override val adFreeNotice = "Hisab is 100% ad-free and keeps your financial data private under your own account."
+  override val invalidInputError = "Please enter a valid title and positive amount"
+  override val catFood = "Food"
+  override val catTransport = "Transport"
+  override val catGroceries = "Groceries"
+  override val catUtilities = "Bills & Utilities"
+  override val catShopping = "Shopping"
+  override val catHealth = "Health"
+  override val catEducation = "Education"
+  override val catEntertainment = "Entertainment"
+  override val catFamily = "Family & Gifts"
+  override val catOther = "Other"
+  override val budgetAlert80Title = "Budget Warning (80%+)"
+  override val budgetAlert100Title = "Budget Limit Reached!"
+  override val reminderNotificationTitle = "Logged today's expenses?"
+  override val reminderNotificationBody = "Take a moment to record your daily spending in Hisab."
+  override val themeEmerald = "Emerald"
+  override val themeIndigo = "Indigo"
+  override val themeTerracotta = "Terracotta"
+  override val themeOcean = "Ocean"
+  override val themePlum = "Plum"
+  override val remainingBalance = "Remaining Balance"
+  override val addedBalance = "Added Balance"
+  override val addBalance = "Add Balance"
+  override val editBalance = "Edit Balance"
+  override val balanceTitleLabel = "Source (e.g., Salary, Wallet Top-up)"
+  override val balanceFilterChip = "Deposits (+)"
+  override val expenseTypeTab = "Expense (-)"
+  override val balanceTypeTab = "Balance (+)"
+  override val receiveMethodLabel = "Deposit Channel"
+  override val confirmDeleteBalanceTitle = "Delete Balance Entry?"
+  override val confirmDeleteBalanceMessage = "This balance deposit record will be permanently removed."
+  override val overallWalletBalance = "Overall Wallet Balance"
+  override val entryTypeExpense = "Expense"
+  override val entryTypeIncome = "Balance"
+  override val navWallets = "Wallets"
+  override val transferTypeTab = "Transfer"
+  override val borrowTypeTab = "Borrow"
+  override val addTransfer = "Transfer Funds"
+  override val editTransfer = "Edit Transfer"
+  override val fromAccountLabel = "From Account"
+  override val toAccountLabel = "To Account"
+  override val sameAccountTransferError = "From and To accounts must be different"
+  override val addBorrow = "Borrow Money (Payable)"
+  override val editBorrow = "Edit Payable"
+  override val lenderNameLabel = "Borrowed From (Person Name)"
+  override val borrowAutoPayableHint = "Amount will be added to the selected account and a Payable for this person will be created automatically."
+  override val transferFilterChip = "Transfers"
+  override val payableFilterChip = "Payables"
+  override val walletsScreenTitle = "Wallets & Payables"
+  override val accountBalancesTitle = "Account Balances"
+  override val totalPayablesLabel = "Total Payables"
+  override val unpaidPayablesTitle = "Unpaid Payables"
+  override val settledPayablesTitle = "Settled Payables"
+  override val noPayablesEmpty = "No active payables"
+  override val repayButton = "Pay"
+  override val repayPayableTitle = "Repay Payable"
+  override val paidFromAccountLabel = "Pay From Account"
+  override val paidAmountLabel = "Paid"
+  override val dueAmountLabel = "Due"
+  override val settledBadge = "Settled"
+  override val repaymentHistoryTitle = "Repayment History"
+  override val transferHistoryTitle = "Account Transfers"
+  override val quickTransferAction = "Transfer"
+  override val quickBorrowAction = "Borrow (+)"
+  override val confirmDeleteTransferTitle = "Delete Transfer?"
+  override val confirmDeleteTransferMessage = "This transfer record will be removed and account balances adjusted."
+  override val confirmDeletePayableTitle = "Delete Payable?"
+  override val confirmDeletePayableMessage = "This payable and its repayment history will be permanently removed."
+  override val confirmDeleteRepaymentTitle = "Delete Repayment?"
+  override val confirmDeleteRepaymentMessage = "Removing this repayment will restore the due balance."
+  override val entryTypeTransfer = "Transfer"
+  override val entryTypeBorrow = "Borrowed"
+  override val entryTypeRepayment = "Loan Paid"
+  override val walletCashLabel = "Cash (Wallet)"
+  override val lendTypeTab = "Lend (-)"
+  override val addLend = "Lend Money (Receivable)"
+  override val editLend = "Edit Receivable"
+  override val borrowerNameLabel = "Lent To (Person Name)"
+  override val lendAutoReceivableHint = "Amount will be deducted from the selected account and a Receivable for this person will be created automatically."
+  override val lendFromAccountLabel = "Lent From Account"
+  override val receivableFilterChip = "Receivables"
+  override val totalReceivablesLabel = "Total Receivables"
+  override val unpaidReceivablesTitle = "Pending Receivables"
+  override val settledReceivablesTitle = "Collected Receivables"
+  override val noReceivablesEmpty = "No pending receivables"
+  override val collectButton = "Collect"
+  override val collectReceivableTitle = "Collect Receivable"
+  override val collectedToAccountLabel = "Received Into Account"
+  override val collectedAmountLabel = "Collected"
+  override val collectionHistoryTitle = "Collection History"
+  override val quickLendAction = "Lend (-)"
+  override val confirmDeleteReceivableTitle = "Delete Receivable?"
+  override val confirmDeleteReceivableMessage = "This receivable and its collection history will be permanently removed."
+  override val confirmDeleteCollectionTitle = "Delete Collection?"
+  override val confirmDeleteCollectionMessage = "Removing this collection will restore the due receivable balance."
+  override val entryTypeLend = "Lent Money"
+  override val entryTypeCollection = "Loan Collected"
+  override val payablesTab = "Payables (Borrowed)"
+  override val receivablesTab = "Receivables (Lent)"
+  override val marketListTitle = "Market List"
+  override val marketCardTitle = "Bazaar & Grocery List"
+  override val marketCardSubtitle = "Create a checklist or share live with family by email"
+  override val marketNewListButton = "New List"
+  override val marketListNameLabel = "List title (e.g., Weekly Bazaar)"
+  override val shareWithEmailLabel = "Send to Email (optional)"
+  override val shareWithEmailHint = "e.g., partner@gmail.com — syncs live to their phone"
+  override val sharedByLabel = "From"
+  override val sharedWithLabel = "Shared with"
+  override val noMarketListsTitle = "No market lists yet"
+  override val noMarketListsBody = "Create a grocery checklist or send one to your spouse's email so they can shop live."
+  override val itemNameLabel = "Item name (e.g., Rice, Eggs)"
+  override val itemQtyLabel = "Qty (e.g., 2 kg)"
+  override val itemPriceOptionalLabel = "Price (optional)"
+  override val addItemButton = "Add Item"
+  override val boughtLabel = "Bought"
+  override val remainingItemsLabel = "Remaining"
+  override val estimatedTotalLabel = "Estimated Total"
+  override val logAsExpenseButton = "Save as Bazaar Expense"
+  override val markCompletedButton = "Finish Shopping"
+  override val reopenListButton = "Reopen List"
+  override val shareListTitle = "Send List by Email"
+  override val shareListButton = "Update Share"
+  override val shareViaTextButton = "Share Text"
+  override val marketExpenseSaved = "Saved market total as expense!"
+  override val confirmDeleteMarketListTitle = "Delete Market List?"
+  override val confirmDeleteMarketListMessage = "This market list and all its items will be permanently removed."
+  override val editItemTitle = "Edit Item"
+  override val completedBadge = "Done"
+  override val activeBadge = "Active"
+  override val sharedListSavedMsg = "Market list sharing updated"
+  override val splitByCategoryOption = "Split into separate category expenses"
+  override val singleCategoryOption = "Save total under one category"
+  override val marketSplitExpenseSaved = "Saved expenses across categories!"
+  override val itemCategoryLabel = "Category"
+}
 
-val HindiStrings = AppStrings(
-  appName = "हिसाब",
-  tagline = "दैनिक खर्चों का सरल और सुरक्षित साथी",
-  navExpenses = "खर्च",
-  navReports = "रिपोर्ट",
-  navBudgets = "बजट",
-  navSettings = "सेटिंग्स",
-  signInTitle = "हिसाब में आपका स्वागत है",
-  signInSubtitle = "विज्ञापन-मुक्त दैनिक खर्च ट्रैकिंग, ऑफलाइन मोड, क्लाउड सिंक और Google Drive बैकअप के साथ।",
-  signInWithGoogle = "Google से साइन इन करें",
-  adFreeBadge = "100% विज्ञापन मुक्त",
-  featureOfflineTitle = "ऑफलाइन मोड",
-  featureOfflineDesc = "बिना इंटरनेट के भी खर्च जोड़ें और देखें",
-  featureCloudTitle = "क्लाउड सिंक",
-  featureCloudDesc = "सभी डिवाइस पर डेटा सुरक्षित रूप से सिंक",
-  featureDriveTitle = "Google Drive बैकअप",
-  featureDriveDesc = "एक टैप में ड्राइव बैकअप और रीस्टोर",
-  onlineSynced = "ऑनलाइन • सिंक किया गया",
-  offlineModeActive = "ऑफलाइन मोड चालू",
-  offlineCached = "ऑफलाइन • लोकल सेव",
-  syncingPending = "सिंक हो रहा है...",
-  thisMonthSpend = "इस महीने का कुल खर्च",
-  budgetRemaining = "शेष बजट",
-  budgetExceededBy = "बजट से अधिक",
-  setBudgetHint = "मासिक बजट सेट करें",
-  dailyAllowance = "दैनिक सीमा",
-  today = "आज",
-  yesterday = "कल",
-  allCategories = "सभी",
-  searchExpenses = "खर्च खोजें...",
-  addExpense = "नया खर्च जोड़ें",
-  editExpense = "खर्च संपादित करें",
-  expenseTitleLabel = "विवरण (जैसे: दोपहर का खाना)",
-  amountLabel = "राशि",
-  categoryLabel = "श्रेणी चुनें",
-  paymentMethodLabel = "भुगतान का माध्यम",
-  dateLabel = "तारीख",
-  noteOptionalLabel = "नोट (वैकल्पिक)",
-  save = "सहेजें",
-  cancel = "रद्द करें",
-  delete = "हटाएं",
-  confirmDeleteTitle = "खर्च हटाएं?",
-  confirmDeleteMessage = "यह खर्च रिकॉर्ड स्थायी रूप से हटा दिया जाएगा।",
-  emptyExpensesTitle = "अभी तक कोई खर्च नहीं जोड़ा गया",
-  emptyExpensesBody = "अपना पहला दैनिक खर्च जोड़ने के लिए नीचे '+' बटन दबाएं।",
-  addCustomCategory = "नई श्रेणी",
-  customCategoryName = "श्रेणी का नाम",
-  chooseColor = "रंग चुनें",
-  chooseIcon = "आइकन चुनें",
-  cash = "नकद",
-  card = "कार्ड",
-  mobileBanking = "मोबाइल पे",
-  bank = "बैंक",
-  monthlyReportTitle = "मासिक रिपोर्ट",
-  totalSpent = "कुल खर्च",
-  dailyAverage = "दैनिक औसत",
-  transactionsCount = "लेन-देन",
-  topCategory = "शीर्ष श्रेणी",
-  vsPrevMonth = "पिछले महीने से",
-  categoryChartTitle = "श्रेणी के अनुसार खर्च",
-  dailyTrendTitle = "दैनिक खर्च का ग्राफ",
-  sixMonthChartTitle = "पिछले 6 महीनों की तुलना",
-  categoryBreakdown = "श्रेणी विवरण",
-  tapBarHint = "विवरण देखने के लिए किसी बार या हिस्से पर टैप करें",
-  noDataForMonth = "इस महीने के लिए कोई खर्च डेटा नहीं है",
-  budgetSettingsTitle = "बजट और रिमाइंडर",
-  monthlyBudgetLimit = "मासिक कुल बजट",
-  categoryBudgetsTitle = "श्रेणी बजट",
-  saveBudget = "बजट सहेजें",
-  budgetSaved = "बजट सफलतापूर्वक सहेजा गया",
-  spentOf = "खर्च /",
-  reminderSettingsTitle = "नोटिफिकेशन रिमाइंडर",
-  dailyReminderLabel = "दैनिक खर्च रिमाइंडर",
-  dailyReminderDesc = "हर दिन तय समय पर याद दिलाएगा",
-  reminderTimeLabel = "रिमाइंडर समय",
-  budgetAlertsLabel = "बजट अलर्ट",
-  budgetAlertsDesc = "80% या 100% बजट पार होने पर सूचना दें",
-  notificationPermNeeded = "रिमाइंडर के लिए नोटिफिकेशन अनुमति दें",
-  grantPermission = "अनुमति दें",
-  settingsTitle = "सेटिंग्स और बैकअप",
-  accountSection = "खाता",
-  signOut = "साइन आउट",
-  syncSection = "क्लाउड सिंक और ऑफलाइन मोड",
-  cloudSyncToggle = "ऑटो क्लाउड सिंक",
-  cloudSyncDesc = "बंद करने पर ऐप पूरी तरह ऑफलाइन चलेगा",
-  driveBackupSection = "Google Drive बैकअप",
-  backUpToDrive = "Google Drive पर बैकअप लें",
-  restoreFromDrive = "Google Drive से रीस्टोर करें",
-  lastDriveBackup = "अंतिम ड्राइव बैकअप",
-  neverBackedUp = "अभी तक बैकअप नहीं लिया गया",
-  driveBackupSuccess = "Google Drive बैकअप सफल रहा!",
-  driveRestoreSuccess = "Google Drive से डेटा रीस्टोर हो गया!",
-  chooseBackupTitle = "रीस्टोर करने के लिए बैकअप चुनें",
-  noDriveBackups = "Google Drive पर कोई बैकअप नहीं मिला",
-  localExportSection = "डेटा एक्सपोर्ट और लोकल बैकअप",
-  exportCsv = "CSV एक्सपोर्ट (Excel)",
-  exportJson = "JSON बैकअप सहेजें",
-  importJson = "JSON बैकअप इम्पोर्ट करें",
-  exportSuccess = "सफलतापूर्वक एक्सपोर्ट हो गया",
-  importSuccess = "बजट और खर्च डेटा इम्पोर्ट हो गया",
-  securitySection = "पिन सुरक्षा",
-  pinLockToggle = "पिन लॉक चालू करें",
-  pinLockDesc = "ऐप खोलने के लिए 4-अंकों का पिन आवश्यक होगा",
-  changePin = "पिन बदलें",
-  lockOnBackground = "बैकग्राउंड में जाने पर लॉक करें",
-  enterPinTitle = "अनलॉक करने के लिए पिन दर्ज करें",
-  createPinTitle = "नया 4-अंकों का पिन बनाएं",
-  confirmPinTitle = "पिन की पुष्टि करें",
-  pinMismatch = "पिन मेल नहीं खाया, पुनः प्रयास करें",
-  wrongPin = "गलत पिन! पुनः प्रयास करें",
-  pinSaved = "पिन सुरक्षा चालू हो गई",
-  appearanceSection = "थीम और डार्क मोड",
-  themeModeLabel = "डिस्प्ले मोड",
-  themeSystem = "सिस्टम",
-  themeLight = "लाइट",
-  themeDark = "डार्क",
-  themePaletteLabel = "कस्टम रंग थीम",
-  languageCurrencySection = "भाषा और मुद्रा",
-  languageLabel = "भाषा",
-  currencyLabel = "मुद्रा",
-  customCategoriesSection = "कस्टम श्रेणियां",
-  adFreeNotice = "हिसाब 100% विज्ञापन-मुक्त है और आपका डेटा आपके निजी खाते में सुरक्षित रहता है।",
-  invalidInputError = "कृपया सही विवरण और सकारात्मक राशि दर्ज करें",
-  catFood = "भोजन",
-  catTransport = "यात्रा",
-  catGroceries = "किराना",
-  catUtilities = "बिल और यूटिलिटी",
-  catShopping = "खरीदारी",
-  catHealth = "स्वास्थ्य",
-  catEducation = "शिक्षा",
-  catEntertainment = "मनोरंजन",
-  catFamily = "परिवार और उपहार",
-  catOther = "अन्य",
-  budgetAlert80Title = "बजट चेतावनी (80%+)",
-  budgetAlert100Title = "बजट सीमा पार!",
-  reminderNotificationTitle = "आज के खर्च दर्ज किए?",
-  reminderNotificationBody = "हिसाब ऐप में आज के खर्च जोड़ना न भूलें।",
-  themeEmerald = "एमराल्ड",
-  themeIndigo = "इंडिगो",
-  themeTerracotta = "टेराकोटा",
-  themeOcean = "ओशन",
-  themePlum = "प्लम",
-  remainingBalance = "शेष बैलेंस",
-  addedBalance = "जोड़ा गया बैलेंस",
-  addBalance = "बैलेंस जोड़ें",
-  editBalance = "बैलेंस संपादित करें",
-  balanceTitleLabel = "स्रोत (जैसे: वेतन, नकद जमा)",
-  balanceFilterChip = "बैलेंस (+)",
-  expenseTypeTab = "खर्च (-)",
-  balanceTypeTab = "बैलेंस (+)",
-  receiveMethodLabel = "जमा माध्यम",
-  confirmDeleteBalanceTitle = "बैलेंस एंट्री हटाएं?",
-  confirmDeleteBalanceMessage = "यह बैलेंस रिकॉर्ड स्थायी रूप से हट जाएगा।",
-  overallWalletBalance = "कुल वॉलेट बैलेंस",
-  entryTypeExpense = "खर्च",
-  entryTypeIncome = "बैलेंस",
-  navWallets = "वॉलेट",
-  transferTypeTab = "ट्रांसफर",
-  borrowTypeTab = "उधार (+)",
-  addTransfer = "खाता ट्रांसफर",
-  editTransfer = "ट्रांसफर संपादित करें",
-  fromAccountLabel = "किस खाते से (From)",
-  toAccountLabel = "किस खाते में (To)",
-  sameAccountTransferError = "भेजने और प्राप्त करने वाले खाते अलग होने चाहिए",
-  addBorrow = "उधार लें (Payable)",
-  editBorrow = "देय संपादित करें",
-  lenderNameLabel = "किससे उधार लिया (नाम)",
-  borrowAutoPayableHint = "यह राशि चुने गए खाते में जुड़ जाएगी और स्वतः एक देय (Payable) बन जाएगा।",
-  transferFilterChip = "ट्रांसफर (⇄)",
-  payableFilterChip = "उधार / देय",
-  walletsScreenTitle = "वॉलेट और देय",
-  accountBalancesTitle = "खातों का बैलेंस",
-  totalPayablesLabel = "कुल देय (उधार)",
-  unpaidPayablesTitle = "बकाया देय (Payables)",
-  settledPayablesTitle = "चुकता देय",
-  noPayablesEmpty = "कोई बकाया देय नहीं है",
-  repayButton = "चुकता करें",
-  repayPayableTitle = "उधार चुकाएं",
-  paidFromAccountLabel = "किस खाते से भुगतान",
-  paidAmountLabel = "चुकता",
-  dueAmountLabel = "शेष देय",
-  settledBadge = "चुकता",
-  repaymentHistoryTitle = "भुगतान इतिहास",
-  transferHistoryTitle = "खाता ट्रांसफर",
-  quickTransferAction = "ट्रांसफर",
-  quickBorrowAction = "उधार (+)",
-  confirmDeleteTransferTitle = "ट्रांसफर हटाएं?",
-  confirmDeleteTransferMessage = "यह ट्रांसफर रिकॉर्ड स्थायी रूप से हट जाएगा और खाते का बैलेंस अपडेट होगा।",
-  confirmDeletePayableTitle = "देय रिकॉर्ड हटाएं?",
-  confirmDeletePayableMessage = "यह देय और इसके भुगतान का विवरण स्थायी रूप से हट जाएगा।",
-  confirmDeleteRepaymentTitle = "भुगतान हटाएं?",
-  confirmDeleteRepaymentMessage = "इसे हटाने पर बकाया राशि फिर बढ़ जाएगी।",
-  entryTypeTransfer = "ट्रांसफर",
-  entryTypeBorrow = "उधार (Payable)",
-  entryTypeRepayment = "उधार चुकाया",
-  walletCashLabel = "नकद (वॉलेट)",
-  lendTypeTab = "उधार दिया",
-  addLend = "उधार दें (प्राप्य)",
-  editLend = "प्राप्य संपादित करें",
-  borrowerNameLabel = "किसे उधार दिया (नाम)",
-  lendAutoReceivableHint = "यह राशि चुने गए खाते से कम होगी और स्वतः आपका प्राप्य (Receivable) बन जाएगा।",
-  lendFromAccountLabel = "किस खाते से दिया",
-  receivableFilterChip = "प्राप्य (उधार दिया)",
-  totalReceivablesLabel = "कुल प्राप्य (Receivable)",
-  unpaidReceivablesTitle = "बकाया प्राप्य",
-  settledReceivablesTitle = "वसूल प्राप्य",
-  noReceivablesEmpty = "कोई बकाया प्राप्य नहीं है",
-  collectButton = "वसूल करें",
-  collectReceivableTitle = "प्राप्य वसूल करें",
-  collectedToAccountLabel = "किस खाते में मिला",
-  collectedAmountLabel = "वसूल",
-  collectionHistoryTitle = "वसूली इतिहास",
-  quickLendAction = "उधार दिया (-)",
-  confirmDeleteReceivableTitle = "प्राप्य रिकॉर्ड हटाएं?",
-  confirmDeleteReceivableMessage = "यह प्राप्य और इसकी वसूली का विवरण स्थायी रूप से हट जाएगा।",
-  confirmDeleteCollectionTitle = "वसूली हटाएं?",
-  confirmDeleteCollectionMessage = "इसे हटाने पर बकाया राशि फिर बढ़ जाएगी।",
-  entryTypeLend = "उधार दिया",
-  entryTypeCollection = "वसूली मिली",
-  payablesTab = "देय (लिया)",
-  receivablesTab = "प्राप्य (दिया)",
-  marketListTitle = "बाज़ार लिस्ट",
-  marketCardTitle = "बाज़ार व किराना लिस्ट",
-  marketCardSubtitle = "लिस्ट बनाएं या परिवार के ईमेल पर भेजें",
-  marketNewListButton = "नई लिस्ट",
-  marketListNameLabel = "लिस्ट का नाम (जैसे: आज का बाज़ार)",
-  shareWithEmailLabel = "किसके ईमेल पर भेजें (वैकल्पिक)",
-  shareWithEmailHint = "जैसे: partner@gmail.com — उनके फोन में लाइव दिखेगी",
-  sharedByLabel = "भेजने वाले",
-  sharedWithLabel = "शेयर किया गया",
-  noMarketListsTitle = "अभी कोई बाज़ार लिस्ट नहीं है",
-  noMarketListsBody = "किराना चेकलिस्ट बनाएं या जीवनसाथी के ईमेल पर भेजें।",
-  itemNameLabel = "सामान का नाम (जैसे: चावल, आलू)",
-  itemQtyLabel = "मात्रा (जैसे: 2 किलो)",
-  itemPriceOptionalLabel = "कीमत (वैकल्पिक)",
-  addItemButton = "जोड़ें",
-  boughtLabel = "खरीदा गया",
-  remainingItemsLabel = "बाकी",
-  estimatedTotalLabel = "कुल हिसाब",
-  logAsExpenseButton = "खर्च में सेव करें",
-  markCompletedButton = "बाज़ार पूरा",
-  reopenListButton = "पुनः खोलें",
-  shareListTitle = "ईमेल से लिस्ट भेजें",
-  shareListButton = "शेयर अपडेट",
-  shareViaTextButton = "टेक्स्ट शेयर",
-  marketExpenseSaved = "बाज़ार का कुल खर्च सेव हो गया!",
-  confirmDeleteMarketListTitle = "बाज़ार लिस्ट हटाएं?",
-  confirmDeleteMarketListMessage = "यह बाज़ार लिस्ट और सभी आइटम स्थायी रूप से हट जाएंगे।",
-  editItemTitle = "आइटम संपादित करें",
-  completedBadge = "पूर्ण",
-  activeBadge = "सक्रिय",
-  sharedListSavedMsg = "बाज़ार लिस्ट शेयरिंग अपडेट हुई",
-  splitByCategoryOption = "श्रेणी के अनुसार अलग-अलग खर्च सहेजें",
-  singleCategoryOption = "एक ही श्रेणी में कुल खर्च सहेजें",
-  marketSplitExpenseSaved = "सभी श्रेणियों में खर्च सहेजा गया!",
-  itemCategoryLabel = "श्रेणी",
-)
+object HindiStrings : AppStrings {
+  override val appName = "हिसाब"
+  override val tagline = "दैनिक खर्चों का सरल और सुरक्षित साथी"
+  override val navExpenses = "खर्च"
+  override val navReports = "रिपोर्ट"
+  override val navBudgets = "बजट"
+  override val navSettings = "सेटिंग्स"
+  override val signInTitle = "हिसाब में आपका स्वागत है"
+  override val signInSubtitle = "विज्ञापन-मुक्त दैनिक खर्च ट्रैकिंग, ऑफलाइन मोड, क्लाउड सिंक और Google Drive बैकअप के साथ।"
+  override val signInWithGoogle = "Google से साइन इन करें"
+  override val adFreeBadge = "100% विज्ञापन मुक्त"
+  override val featureOfflineTitle = "ऑफलाइन मोड"
+  override val featureOfflineDesc = "बिना इंटरनेट के भी खर्च जोड़ें और देखें"
+  override val featureCloudTitle = "क्लाउड सिंक"
+  override val featureCloudDesc = "सभी डिवाइस पर डेटा सुरक्षित रूप से सिंक"
+  override val featureDriveTitle = "Google Drive बैकअप"
+  override val featureDriveDesc = "एक टैप में ड्राइव बैकअप और रीस्टोर"
+  override val onlineSynced = "ऑनलाइन • सिंक किया गया"
+  override val offlineModeActive = "ऑफलाइन मोड चालू"
+  override val offlineCached = "ऑफलाइन • लोकल सेव"
+  override val syncingPending = "सिंक हो रहा है..."
+  override val thisMonthSpend = "इस महीने का कुल खर्च"
+  override val budgetRemaining = "शेष बजट"
+  override val budgetExceededBy = "बजट से अधिक"
+  override val setBudgetHint = "मासिक बजट सेट करें"
+  override val dailyAllowance = "दैनिक सीमा"
+  override val today = "आज"
+  override val yesterday = "कल"
+  override val allCategories = "सभी"
+  override val searchExpenses = "खर्च खोजें..."
+  override val addExpense = "नया खर्च जोड़ें"
+  override val editExpense = "खर्च संपादित करें"
+  override val expenseTitleLabel = "विवरण (जैसे: दोपहर का खाना)"
+  override val amountLabel = "राशि"
+  override val categoryLabel = "श्रेणी चुनें"
+  override val paymentMethodLabel = "भुगतान का माध्यम"
+  override val dateLabel = "तारीख"
+  override val noteOptionalLabel = "नोट (वैकल्पिक)"
+  override val save = "सहेजें"
+  override val cancel = "रद्द करें"
+  override val delete = "हटाएं"
+  override val confirmDeleteTitle = "खर्च हटाएं?"
+  override val confirmDeleteMessage = "यह खर्च रिकॉर्ड स्थायी रूप से हटा दिया जाएगा।"
+  override val emptyExpensesTitle = "अभी तक कोई खर्च नहीं जोड़ा गया"
+  override val emptyExpensesBody = "अपना पहला दैनिक खर्च जोड़ने के लिए नीचे '+' बटन दबाएं।"
+  override val addCustomCategory = "नई श्रेणी"
+  override val customCategoryName = "श्रेणी का नाम"
+  override val chooseColor = "रंग चुनें"
+  override val chooseIcon = "आइकन चुनें"
+  override val cash = "नकद"
+  override val card = "कार्ड"
+  override val mobileBanking = "मोबाइल पे"
+  override val bank = "बैंक"
+  override val monthlyReportTitle = "मासिक रिपोर्ट"
+  override val totalSpent = "कुल खर्च"
+  override val dailyAverage = "दैनिक औसत"
+  override val transactionsCount = "लेन-देन"
+  override val topCategory = "शीर्ष श्रेणी"
+  override val vsPrevMonth = "पिछले महीने से"
+  override val categoryChartTitle = "श्रेणी के अनुसार खर्च"
+  override val dailyTrendTitle = "दैनिक खर्च का ग्राफ"
+  override val sixMonthChartTitle = "पिछले 6 महीनों की तुलना"
+  override val categoryBreakdown = "श्रेणी विवरण"
+  override val tapBarHint = "विवरण देखने के लिए किसी बार या हिस्से पर टैप करें"
+  override val noDataForMonth = "इस महीने के लिए कोई खर्च डेटा नहीं है"
+  override val budgetSettingsTitle = "बजट और रिमाइंडर"
+  override val monthlyBudgetLimit = "मासिक कुल बजट"
+  override val categoryBudgetsTitle = "श्रेणी बजट"
+  override val saveBudget = "बजट सहेजें"
+  override val budgetSaved = "बजट सफलतापूर्वक सहेजा गया"
+  override val spentOf = "खर्च /"
+  override val reminderSettingsTitle = "नोटिफिकेशन रिमाइंडर"
+  override val dailyReminderLabel = "दैनिक खर्च रिमाइंडर"
+  override val dailyReminderDesc = "हर दिन तय समय पर याद दिलाएगा"
+  override val reminderTimeLabel = "रिमाइंडर समय"
+  override val budgetAlertsLabel = "बजट अलर्ट"
+  override val budgetAlertsDesc = "80% या 100% बजट पार होने पर सूचना दें"
+  override val notificationPermNeeded = "रिमाइंडर के लिए नोटिफिकेशन अनुमति दें"
+  override val grantPermission = "अनुमति दें"
+  override val settingsTitle = "सेटिंग्स और बैकअप"
+  override val accountSection = "खाता"
+  override val signOut = "साइन आउट"
+  override val syncSection = "क्लाउड सिंक और ऑफलाइन मोड"
+  override val cloudSyncToggle = "ऑटो क्लाउड सिंक"
+  override val cloudSyncDesc = "बंद करने पर ऐप पूरी तरह ऑफलाइन चलेगा"
+  override val driveBackupSection = "Google Drive बैकअप"
+  override val backUpToDrive = "Google Drive पर बैकअप लें"
+  override val restoreFromDrive = "Google Drive से रीस्टोर करें"
+  override val lastDriveBackup = "अंतिम ड्राइव बैकअप"
+  override val neverBackedUp = "अभी तक बैकअप नहीं लिया गया"
+  override val driveBackupSuccess = "Google Drive बैकअप सफल रहा!"
+  override val driveRestoreSuccess = "Google Drive से डेटा रीस्टोर हो गया!"
+  override val chooseBackupTitle = "रीस्टोर करने के लिए बैकअप चुनें"
+  override val noDriveBackups = "Google Drive पर कोई बैकअप नहीं मिला"
+  override val localExportSection = "डेटा एक्सपोर्ट और लोकल बैकअप"
+  override val exportCsv = "CSV एक्सपोर्ट (Excel)"
+  override val exportJson = "JSON बैकअप सहेजें"
+  override val importJson = "JSON बैकअप इम्पोर्ट करें"
+  override val exportSuccess = "सफलतापूर्वक एक्सपोर्ट हो गया"
+  override val importSuccess = "बजट और खर्च डेटा इम्पोर्ट हो गया"
+  override val securitySection = "पिन सुरक्षा"
+  override val pinLockToggle = "पिन लॉक चालू करें"
+  override val pinLockDesc = "ऐप खोलने के लिए 4-अंकों का पिन आवश्यक होगा"
+  override val changePin = "पिन बदलें"
+  override val lockOnBackground = "बैकग्राउंड में जाने पर लॉक करें"
+  override val enterPinTitle = "अनलॉक करने के लिए पिन दर्ज करें"
+  override val createPinTitle = "नया 4-अंकों का पिन बनाएं"
+  override val confirmPinTitle = "पिन की पुष्टि करें"
+  override val pinMismatch = "पिन मेल नहीं खाया, पुनः प्रयास करें"
+  override val wrongPin = "गलत पिन! पुनः प्रयास करें"
+  override val pinSaved = "पिन सुरक्षा चालू हो गई"
+  override val appearanceSection = "थीम और डार्क मोड"
+  override val themeModeLabel = "डिस्प्ले मोड"
+  override val themeSystem = "सिस्टम"
+  override val themeLight = "लाइट"
+  override val themeDark = "डार्क"
+  override val themePaletteLabel = "कस्टम रंग थीम"
+  override val languageCurrencySection = "भाषा और मुद्रा"
+  override val languageLabel = "भाषा"
+  override val currencyLabel = "मुद्रा"
+  override val customCategoriesSection = "कस्टम श्रेणियां"
+  override val adFreeNotice = "हिसाब 100% विज्ञापन-मुक्त है और आपका डेटा आपके निजी खाते में सुरक्षित रहता है।"
+  override val invalidInputError = "कृपया सही विवरण और सकारात्मक राशि दर्ज करें"
+  override val catFood = "भोजन"
+  override val catTransport = "यात्रा"
+  override val catGroceries = "किराना"
+  override val catUtilities = "बिल और यूटिलिटी"
+  override val catShopping = "खरीदारी"
+  override val catHealth = "स्वास्थ्य"
+  override val catEducation = "शिक्षा"
+  override val catEntertainment = "मनोरंजन"
+  override val catFamily = "परिवार और उपहार"
+  override val catOther = "अन्य"
+  override val budgetAlert80Title = "बजट चेतावनी (80%+)"
+  override val budgetAlert100Title = "बजट सीमा पार!"
+  override val reminderNotificationTitle = "आज के खर्च दर्ज किए?"
+  override val reminderNotificationBody = "हिसाब ऐप में आज के खर्च जोड़ना न भूलें।"
+  override val themeEmerald = "एमराल्ड"
+  override val themeIndigo = "इंडिगो"
+  override val themeTerracotta = "टेराकोटा"
+  override val themeOcean = "ओशन"
+  override val themePlum = "प्लम"
+  override val remainingBalance = "शेष बैलेंस"
+  override val addedBalance = "जोड़ा गया बैलेंस"
+  override val addBalance = "बैलेंस जोड़ें"
+  override val editBalance = "बैलेंस संपादित करें"
+  override val balanceTitleLabel = "स्रोत (जैसे: वेतन, नकद जमा)"
+  override val balanceFilterChip = "बैलेंस (+)"
+  override val expenseTypeTab = "खर्च (-)"
+  override val balanceTypeTab = "बैलेंस (+)"
+  override val receiveMethodLabel = "जमा माध्यम"
+  override val confirmDeleteBalanceTitle = "बैलेंस एंट्री हटाएं?"
+  override val confirmDeleteBalanceMessage = "यह बैलेंस रिकॉर्ड स्थायी रूप से हट जाएगा।"
+  override val overallWalletBalance = "कुल वॉलेट बैलेंस"
+  override val entryTypeExpense = "खर्च"
+  override val entryTypeIncome = "बैलेंस"
+  override val navWallets = "वॉलेट"
+  override val transferTypeTab = "ट्रांसफर"
+  override val borrowTypeTab = "उधार (+)"
+  override val addTransfer = "खाता ट्रांसफर"
+  override val editTransfer = "ट्रांसफर संपादित करें"
+  override val fromAccountLabel = "किस खाते से (From)"
+  override val toAccountLabel = "किस खाते में (To)"
+  override val sameAccountTransferError = "भेजने और प्राप्त करने वाले खाते अलग होने चाहिए"
+  override val addBorrow = "उधार लें (Payable)"
+  override val editBorrow = "देय संपादित करें"
+  override val lenderNameLabel = "किससे उधार लिया (नाम)"
+  override val borrowAutoPayableHint = "यह राशि चुने गए खाते में जुड़ जाएगी और स्वतः एक देय (Payable) बन जाएगा।"
+  override val transferFilterChip = "ट्रांसफर (⇄)"
+  override val payableFilterChip = "उधार / देय"
+  override val walletsScreenTitle = "वॉलेट और देय"
+  override val accountBalancesTitle = "खातों का बैलेंस"
+  override val totalPayablesLabel = "कुल देय (उधार)"
+  override val unpaidPayablesTitle = "बकाया देय (Payables)"
+  override val settledPayablesTitle = "चुकता देय"
+  override val noPayablesEmpty = "कोई बकाया देय नहीं है"
+  override val repayButton = "चुकता करें"
+  override val repayPayableTitle = "उधार चुकाएं"
+  override val paidFromAccountLabel = "किस खाते से भुगतान"
+  override val paidAmountLabel = "चुकता"
+  override val dueAmountLabel = "शेष देय"
+  override val settledBadge = "चुकता"
+  override val repaymentHistoryTitle = "भुगतान इतिहास"
+  override val transferHistoryTitle = "खाता ट्रांसफर"
+  override val quickTransferAction = "ट्रांसफर"
+  override val quickBorrowAction = "उधार (+)"
+  override val confirmDeleteTransferTitle = "ट्रांसफर हटाएं?"
+  override val confirmDeleteTransferMessage = "यह ट्रांसफर रिकॉर्ड स्थायी रूप से हट जाएगा और खाते का बैलेंस अपडेट होगा।"
+  override val confirmDeletePayableTitle = "देय रिकॉर्ड हटाएं?"
+  override val confirmDeletePayableMessage = "यह देय और इसके भुगतान का विवरण स्थायी रूप से हट जाएगा।"
+  override val confirmDeleteRepaymentTitle = "भुगतान हटाएं?"
+  override val confirmDeleteRepaymentMessage = "इसे हटाने पर बकाया राशि फिर बढ़ जाएगी।"
+  override val entryTypeTransfer = "ट्रांसफर"
+  override val entryTypeBorrow = "उधार (Payable)"
+  override val entryTypeRepayment = "उधार चुकाया"
+  override val walletCashLabel = "नकद (वॉलेट)"
+  override val lendTypeTab = "उधार दिया"
+  override val addLend = "उधार दें (प्राप्य)"
+  override val editLend = "प्राप्य संपादित करें"
+  override val borrowerNameLabel = "किसे उधार दिया (नाम)"
+  override val lendAutoReceivableHint = "यह राशि चुने गए खाते से कम होगी और स्वतः आपका प्राप्य (Receivable) बन जाएगा।"
+  override val lendFromAccountLabel = "किस खाते से दिया"
+  override val receivableFilterChip = "प्राप्य (उधार दिया)"
+  override val totalReceivablesLabel = "कुल प्राप्य (Receivable)"
+  override val unpaidReceivablesTitle = "बकाया प्राप्य"
+  override val settledReceivablesTitle = "वसूल प्राप्य"
+  override val noReceivablesEmpty = "कोई बकाया प्राप्य नहीं है"
+  override val collectButton = "वसूल करें"
+  override val collectReceivableTitle = "प्राप्य वसूल करें"
+  override val collectedToAccountLabel = "किस खाते में मिला"
+  override val collectedAmountLabel = "वसूल"
+  override val collectionHistoryTitle = "वसूली इतिहास"
+  override val quickLendAction = "उधार दिया (-)"
+  override val confirmDeleteReceivableTitle = "प्राप्य रिकॉर्ड हटाएं?"
+  override val confirmDeleteReceivableMessage = "यह प्राप्य और इसकी वसूली का विवरण स्थायी रूप से हट जाएगा।"
+  override val confirmDeleteCollectionTitle = "वसूली हटाएं?"
+  override val confirmDeleteCollectionMessage = "इसे हटाने पर बकाया राशि फिर बढ़ जाएगी।"
+  override val entryTypeLend = "उधार दिया"
+  override val entryTypeCollection = "वसूली मिली"
+  override val payablesTab = "देय (लिया)"
+  override val receivablesTab = "प्राप्य (दिया)"
+  override val marketListTitle = "बाज़ार लिस्ट"
+  override val marketCardTitle = "बाज़ार व किराना लिस्ट"
+  override val marketCardSubtitle = "लिस्ट बनाएं या परिवार के ईमेल पर भेजें"
+  override val marketNewListButton = "नई लिस्ट"
+  override val marketListNameLabel = "लिस्ट का नाम (जैसे: आज का बाज़ार)"
+  override val shareWithEmailLabel = "किसके ईमेल पर भेजें (वैकल्पिक)"
+  override val shareWithEmailHint = "जैसे: partner@gmail.com — उनके फोन में लाइव दिखेगी"
+  override val sharedByLabel = "भेजने वाले"
+  override val sharedWithLabel = "शेयर किया गया"
+  override val noMarketListsTitle = "अभी कोई बाज़ार लिस्ट नहीं है"
+  override val noMarketListsBody = "किराना चेकलिस्ट बनाएं या जीवनसाथी के ईमेल पर भेजें।"
+  override val itemNameLabel = "सामान का नाम (जैसे: चावल, आलू)"
+  override val itemQtyLabel = "मात्रा (जैसे: 2 किलो)"
+  override val itemPriceOptionalLabel = "कीमत (वैकल्पिक)"
+  override val addItemButton = "जोड़ें"
+  override val boughtLabel = "खरीदा गया"
+  override val remainingItemsLabel = "बाकी"
+  override val estimatedTotalLabel = "कुल हिसाब"
+  override val logAsExpenseButton = "खर्च में सेव करें"
+  override val markCompletedButton = "बाज़ार पूरा"
+  override val reopenListButton = "पुनः खोलें"
+  override val shareListTitle = "ईमेल से लिस्ट भेजें"
+  override val shareListButton = "शेयर अपडेट"
+  override val shareViaTextButton = "टेक्स्ट शेयर"
+  override val marketExpenseSaved = "बाज़ार का कुल खर्च सेव हो गया!"
+  override val confirmDeleteMarketListTitle = "बाज़ार लिस्ट हटाएं?"
+  override val confirmDeleteMarketListMessage = "यह बाज़ार लिस्ट और सभी आइटम स्थायी रूप से हट जाएंगे।"
+  override val editItemTitle = "आइटम संपादित करें"
+  override val completedBadge = "पूर्ण"
+  override val activeBadge = "सक्रिय"
+  override val sharedListSavedMsg = "बाज़ार लिस्ट शेयरिंग अपडेट हुई"
+  override val splitByCategoryOption = "श्रेणी के अनुसार अलग-अलग खर्च सहेजें"
+  override val singleCategoryOption = "एक ही श्रेणी में कुल खर्च सहेजें"
+  override val marketSplitExpenseSaved = "सभी श्रेणियों में खर्च सहेजा गया!"
+  override val itemCategoryLabel = "श्रेणी"
+}
 
 fun stringsFor(language: AppLanguage): AppStrings = when (language) {
   AppLanguage.BENGALI -> BengaliStrings
@@ -1051,4 +1053,4 @@ fun stringsFor(language: AppLanguage): AppStrings = when (language) {
   AppLanguage.HINDI -> HindiStrings
 }
 
-val LocalStrings = compositionLocalOf { BengaliStrings }
+val LocalStrings = compositionLocalOf<AppStrings> { BengaliStrings }

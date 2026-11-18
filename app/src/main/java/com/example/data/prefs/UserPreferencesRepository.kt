@@ -3,6 +3,7 @@ package com.example.data.prefs
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -12,7 +13,9 @@ import com.example.i18n.AppLanguage
 import com.example.ui.theme.AppThemePalette
 import com.example.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import java.io.IOException
 import java.security.MessageDigest
 
 private val Context.hisabDataStore by preferencesDataStore(name = "hisab_preferences")
@@ -51,23 +54,31 @@ class UserPreferencesRepository(private val context: Context) {
     val LAST_DRIVE_BACKUP_MILLIS = longPreferencesKey("last_drive_backup_millis")
   }
 
-  val settingsFlow: Flow<UserSettings> = context.hisabDataStore.data.map { prefs ->
-    UserSettings(
-      language = AppLanguage.fromCode(prefs[Keys.LANGUAGE]),
-      themeMode = ThemeMode.fromId(prefs[Keys.THEME_MODE]),
-      themePalette = AppThemePalette.fromId(prefs[Keys.THEME_PALETTE]),
-      currencyCode = prefs[Keys.CURRENCY_CODE] ?: CurrencyOption.BDT.code,
-      cloudSyncEnabled = prefs[Keys.CLOUD_SYNC_ENABLED] ?: true,
-      pinEnabled = prefs[Keys.PIN_ENABLED] ?: false,
-      pinHash = prefs[Keys.PIN_HASH] ?: "",
-      lockOnBackground = prefs[Keys.LOCK_ON_BACKGROUND] ?: true,
-      dailyReminderEnabled = prefs[Keys.DAILY_REMINDER_ENABLED] ?: false,
-      reminderHour = prefs[Keys.REMINDER_HOUR] ?: 21,
-      reminderMinute = prefs[Keys.REMINDER_MINUTE] ?: 0,
-      budgetAlertsEnabled = prefs[Keys.BUDGET_ALERTS_ENABLED] ?: true,
-      lastDriveBackupMillis = prefs[Keys.LAST_DRIVE_BACKUP_MILLIS] ?: 0L,
-    )
-  }
+  val settingsFlow: Flow<UserSettings> = context.hisabDataStore.data
+    .catch { exception ->
+      if (exception is IOException) {
+        emit(emptyPreferences())
+      } else {
+        throw exception
+      }
+    }
+    .map { prefs ->
+      UserSettings(
+        language = AppLanguage.fromCode(prefs[Keys.LANGUAGE]),
+        themeMode = ThemeMode.fromId(prefs[Keys.THEME_MODE]),
+        themePalette = AppThemePalette.fromId(prefs[Keys.THEME_PALETTE]),
+        currencyCode = prefs[Keys.CURRENCY_CODE] ?: CurrencyOption.BDT.code,
+        cloudSyncEnabled = prefs[Keys.CLOUD_SYNC_ENABLED] ?: true,
+        pinEnabled = prefs[Keys.PIN_ENABLED] ?: false,
+        pinHash = prefs[Keys.PIN_HASH] ?: "",
+        lockOnBackground = prefs[Keys.LOCK_ON_BACKGROUND] ?: true,
+        dailyReminderEnabled = prefs[Keys.DAILY_REMINDER_ENABLED] ?: false,
+        reminderHour = prefs[Keys.REMINDER_HOUR] ?: 21,
+        reminderMinute = prefs[Keys.REMINDER_MINUTE] ?: 0,
+        budgetAlertsEnabled = prefs[Keys.BUDGET_ALERTS_ENABLED] ?: true,
+        lastDriveBackupMillis = prefs[Keys.LAST_DRIVE_BACKUP_MILLIS] ?: 0L,
+      )
+    }
 
   suspend fun setLanguage(language: AppLanguage) {
     context.hisabDataStore.edit { it[Keys.LANGUAGE] = language.code }

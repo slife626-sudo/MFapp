@@ -99,6 +99,7 @@ import com.example.ui.theme.HisabTheme
 import com.example.viewmodel.AccountBalances
 import com.example.viewmodel.HisabViewModel
 import com.google.firebase.Firebase
+import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.auth
@@ -133,6 +134,9 @@ internal fun FirebaseAuth.authStateFlow(): Flow<FirebaseUser?> = callbackFlow {
 class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    if (FirebaseApp.getApps(this).isEmpty()) {
+      FirebaseApp.initializeApp(this)
+    }
     enableEdgeToEdge()
     setContent {
       val context = LocalContext.current

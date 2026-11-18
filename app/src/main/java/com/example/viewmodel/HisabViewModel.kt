@@ -1268,14 +1268,20 @@ class HisabViewModel(
   }
 
   private fun checkCurrentOnline(context: Context): Boolean {
-    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    val active = cm.activeNetwork ?: return false
-    val caps = cm.getNetworkCapabilities(active) ?: return false
-    return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    return try {
+      val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        ?: return false
+      val active = cm.activeNetwork ?: return false
+      val caps = cm.getNetworkCapabilities(active) ?: return false
+      caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    } catch (e: Exception) {
+      Log.w(TAG, "Connectivity check failed", e)
+      false
+    }
   }
 
   private fun observeConnectivity(context: Context): Flow<Boolean> = callbackFlow {
-    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
     trySend(checkCurrentOnline(context))
     val callback = object : ConnectivityManager.NetworkCallback() {
       override fun onAvailable(network: Network) {
@@ -1286,11 +1292,26 @@ class HisabViewModel(
         trySend(checkCurrentOnline(context))
       }
     }
-    val req = NetworkRequest.Builder()
-      .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-      .build()
-    cm.registerNetworkCallback(req, callback)
-    awaitClose { cm.unregisterNetworkCallback(callback) }
+    var registered = false
+    if (cm != null) {
+      try {
+        val req = NetworkRequest.Builder()
+          .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+          .build()
+        cm.registerNetworkCallback(req, callback)
+        registered = true
+      } catch (e: Exception) {
+        Log.w(TAG, "Failed to register network callback", e)
+      }
+    }
+    awaitClose {
+      if (registered && cm != null) {
+        try {
+          cm.unregisterNetworkCallback(callback)
+        } catch (_: Exception) {
+        }
+      }
+    }
   }
 
   private companion object {
