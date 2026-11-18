@@ -258,6 +258,7 @@ class MarketListRepository(
     name: String,
     quantity: String,
     estimatedPrice: Double,
+    categoryId: String = "groceries",
     note: String,
   ): Result<Unit> {
     val docPath = "marketLists/${list.id}/items"
@@ -268,6 +269,7 @@ class MarketListRepository(
       require(cleanName.isNotEmpty()) { "Item name cannot be empty" }
       val safeMembers = list.memberEmails.take(10).ifEmpty { listOf(normalizeEmail(list.ownerEmail)) }
       val safePrice = estimatedPrice.coerceIn(0.0, 1_000_000_000.0)
+      val safeCategory = categoryId.trim().take(64).ifBlank { "groceries" }
 
       val itemRef = db.collection("marketLists").document(list.id).collection("items").document()
       val payload = mapOf(
@@ -278,6 +280,7 @@ class MarketListRepository(
         "name" to cleanName,
         "quantity" to quantity.trim().take(40),
         "estimatedPrice" to safePrice,
+        "categoryId" to safeCategory,
         "bought" to false,
         "note" to note.trim().take(200),
         "createdAt" to FieldValue.serverTimestamp(),
@@ -299,6 +302,7 @@ class MarketListRepository(
     name: String,
     quantity: String,
     estimatedPrice: Double,
+    categoryId: String = "groceries",
     bought: Boolean,
     note: String,
   ): Result<Unit> {
@@ -309,6 +313,7 @@ class MarketListRepository(
       val cleanName = name.trim().take(120)
       require(cleanName.isNotEmpty()) { "Item name cannot be empty" }
       val safePrice = estimatedPrice.coerceIn(0.0, 1_000_000_000.0)
+      val safeCategory = categoryId.trim().take(64).ifBlank { "groceries" }
 
       db.collection("marketLists").document(listId).collection("items").document(itemId)
         .update(
@@ -316,6 +321,7 @@ class MarketListRepository(
             "name" to cleanName,
             "quantity" to quantity.trim().take(40),
             "estimatedPrice" to safePrice,
+            "categoryId" to safeCategory,
             "bought" to bought,
             "note" to note.trim().take(200),
             "updatedAt" to FieldValue.serverTimestamp(),

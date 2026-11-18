@@ -328,6 +328,7 @@
         "name": { "type": "string", "description": "Item name (1-120 chars)." },
         "quantity": { "type": "string", "description": "Item quantity text (0-40 chars)." },
         "estimatedPrice": { "type": "number", "description": "Estimated or actual price (>= 0)." },
+        "categoryId": { "type": "string", "description": "Expense category identifier (defaults to groceries)." },
         "bought": { "type": "boolean", "description": "Whether the item has been bought." },
         "note": { "type": "string", "description": "Optional note (0-200 chars)." },
         "createdAt": { "type": "string", "format": "date-time" },

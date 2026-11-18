@@ -844,6 +844,7 @@ class HisabViewModel(
     name: String,
     quantity: String,
     estimatedPrice: Double,
+    categoryId: String = "groceries",
     note: String = "",
   ) {
     viewModelScope.launch {
@@ -853,6 +854,7 @@ class HisabViewModel(
         name = name,
         quantity = quantity,
         estimatedPrice = estimatedPrice,
+        categoryId = categoryId,
         note = note,
       ).onFailure { err -> _messages.tryEmit(err.localizedMessage ?: "Failed to add item") }
     }
@@ -864,6 +866,7 @@ class HisabViewModel(
     name: String,
     quantity: String,
     estimatedPrice: Double,
+    categoryId: String = item.categoryId,
     bought: Boolean,
     note: String = item.note,
   ) {
@@ -874,6 +877,7 @@ class HisabViewModel(
         name = name,
         quantity = quantity,
         estimatedPrice = estimatedPrice,
+        categoryId = categoryId,
         bought = bought,
         note = note,
       ).onFailure { err -> _messages.tryEmit(err.localizedMessage ?: "Failed to update item") }
@@ -887,6 +891,7 @@ class HisabViewModel(
       name = item.name,
       quantity = item.quantity,
       estimatedPrice = item.estimatedPrice,
+      categoryId = item.categoryId,
       bought = !item.bought,
       note = item.note,
     )
@@ -903,30 +908,72 @@ class HisabViewModel(
     list: MarketList,
     totalAmount: Double,
     paymentMethod: PaymentMethod,
+    categoryId: String = "groceries",
+    splitByCategory: Boolean = false,
     markCompleted: Boolean = true,
   ) {
     val strings = stringsFor(settings.value.language)
-    val itemsSummary = selectedMarketItems.value
-      .filter { it.bought }
-      .take(6)
-      .joinToString(", ") { it.name }
+    val allItems = selectedMarketItems.value
+    val activeItems = allItems.filter { it.bought }.ifEmpty { allItems }
+    val currentData = (dashboardState.value as? UiState.Success)?.data
+    val mergedCategories = CategoryCatalog.mergeCategories(strings, currentData?.customCategories.orEmpty())
+      .associateBy { it.id }
+
     viewModelScope.launch {
-      val expRes = repository.addExpense(
-        userId = currentUserId,
-        title = list.title,
-        amount = totalAmount,
-        categoryId = "groceries",
-        paymentMethod = paymentMethod,
-        note = itemsSummary,
-        dateMillis = System.currentTimeMillis(),
-      )
-      expRes.onSuccess {
-        if (markCompleted && !list.completed) {
-          marketRepository.toggleMarketListCompleted(list.id, true)
+      val now = System.currentTimeMillis()
+      val pricedBuckets = activeItems
+        .filter { it.estimatedPrice > 0.0 }
+        .groupBy { it.categoryId.ifBlank { "groceries" } }
+
+      if (splitByCategory && pricedBuckets.size > 1) {
+        var allSucceeded = true
+        pricedBuckets.forEach { (catId, bucketItems) ->
+          val bucketSum = bucketItems.sumOf { it.estimatedPrice }
+          val catName = mergedCategories[catId]?.name ?: catId
+          val noteSummary = bucketItems.take(6).joinToString(", ") { it.name }
+          val res = repository.addExpense(
+            userId = currentUserId,
+            title = "${list.title} ($catName)",
+            amount = bucketSum,
+            categoryId = catId,
+            paymentMethod = paymentMethod,
+            note = noteSummary,
+            dateMillis = now,
+          )
+          if (res.isFailure) {
+            allSucceeded = false
+            res.exceptionOrNull()?.let { err ->
+              _messages.tryEmit(err.localizedMessage ?: "Failed to save expense")
+            }
+          }
         }
-        _messages.tryEmit(strings.marketExpenseSaved)
-      }.onFailure { err ->
-        _messages.tryEmit(err.localizedMessage ?: "Failed to save bazaar expense")
+        if (allSucceeded) {
+          if (markCompleted && !list.completed) {
+            marketRepository.toggleMarketListCompleted(list.id, true)
+          }
+          checkBudgetThresholds(DateFormatUtils.monthKeyFromMillis(now), extraAmount = 0.0)
+          _messages.tryEmit(strings.marketSplitExpenseSaved)
+        }
+      } else {
+        val itemsSummary = activeItems.take(6).joinToString(", ") { it.name }
+        val expRes = repository.addExpense(
+          userId = currentUserId,
+          title = list.title,
+          amount = totalAmount,
+          categoryId = categoryId.ifBlank { "groceries" },
+          paymentMethod = paymentMethod,
+          note = itemsSummary,
+          dateMillis = now,
+        )
+        expRes.onSuccess {
+          if (markCompleted && !list.completed) {
+            marketRepository.toggleMarketListCompleted(list.id, true)
+          }
+          checkBudgetThresholds(DateFormatUtils.monthKeyFromMillis(now), extraAmount = 0.0)
+          _messages.tryEmit(strings.marketExpenseSaved)
+        }.onFailure { err ->
+          _messages.tryEmit(err.localizedMessage ?: "Failed to save bazaar expense")
+        }
       }
     }
   }

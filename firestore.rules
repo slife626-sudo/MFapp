@@ -299,6 +299,7 @@ service cloud.firestore {
              data.estimatedPrice is number &&
              data.estimatedPrice >= 0 &&
              data.estimatedPrice <= 1000000000 &&
+             (!('categoryId' in data) || (data.categoryId is string && data.categoryId.size() >= 1 && data.categoryId.size() <= 64)) &&
              data.bought is bool &&
              data.note is string &&
              data.note.size() <= 200 &&
@@ -531,7 +532,7 @@ service cloud.firestore {
                          isValidId(listId) &&
                          isValidId(itemId) &&
                          incoming().keys().hasAll(['listId', 'ownerUid', 'memberEmails', 'addedByEmail', 'name', 'quantity', 'estimatedPrice', 'bought', 'note', 'createdAt', 'updatedAt']) &&
-                         incoming().keys().hasOnly(['listId', 'ownerUid', 'memberEmails', 'addedByEmail', 'name', 'quantity', 'estimatedPrice', 'bought', 'note', 'createdAt', 'updatedAt']) &&
+                         incoming().keys().hasOnly(['listId', 'ownerUid', 'memberEmails', 'addedByEmail', 'name', 'quantity', 'estimatedPrice', 'categoryId', 'bought', 'note', 'createdAt', 'updatedAt']) &&
                          isValidMarketItem(incoming(), listId) &&
                          getAfter(/databases/$(database)/documents/marketLists/$(listId)) != null &&
                          isMarketMember(getAfter(/databases/$(database)/documents/marketLists/$(listId)).data) &&
@@ -547,8 +548,8 @@ service cloud.firestore {
                          incoming().createdAt == existing().createdAt &&
                          (
                            (existing().ownerUid == request.auth.uid &&
-                            incoming().diff(existing()).affectedKeys().hasOnly(['memberEmails', 'name', 'quantity', 'estimatedPrice', 'bought', 'note', 'updatedAt'])) ||
-                           (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'quantity', 'estimatedPrice', 'bought', 'note', 'updatedAt']))
+                            incoming().diff(existing()).affectedKeys().hasOnly(['memberEmails', 'name', 'quantity', 'estimatedPrice', 'categoryId', 'bought', 'note', 'updatedAt'])) ||
+                           (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'quantity', 'estimatedPrice', 'categoryId', 'bought', 'note', 'updatedAt']))
                          );
 
         allow delete: if isValidId(listId) && isValidId(itemId) && isMarketMember(existing());

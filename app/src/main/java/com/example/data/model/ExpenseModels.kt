@@ -170,6 +170,7 @@ data class MarketListItem(
   val name: String = "",
   val quantity: String = "",
   val estimatedPrice: Double = 0.0,
+  val categoryId: String = "groceries",
   val bought: Boolean = false,
   val note: String = "",
   @com.google.firebase.firestore.ServerTimestamp val createdAt: Timestamp? = null,

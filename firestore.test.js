@@ -543,7 +543,7 @@ test("Email-shared MarketList & items: owner creates and shares with spouse emai
     })
   );
 
-  // Wife adds item to the market list
+  // Wife adds item with categoryId to the market list
   const itemRef = listRef.collection("items").doc("item_rice");
   await assertSucceeds(
     itemRef.set({
@@ -554,6 +554,7 @@ test("Email-shared MarketList & items: owner creates and shares with spouse emai
       name: "Miniket Rice",
       quantity: "5 kg",
       estimatedPrice: 380,
+      categoryId: "groceries",
       bought: false,
       note: "",
       createdAt: created,
@@ -590,11 +591,12 @@ test("Email-shared MarketList & items: owner creates and shares with spouse emai
     })
   );
 
-  // Husband marks item as bought with actual price & completes list
+  // Husband marks item as bought with actual price & updated categoryId & completes list
   await assertSucceeds(
     husbandDb.collection("marketLists").doc("list_friday").collection("items").doc("item_rice").update({
       bought: true,
       estimatedPrice: 390,
+      categoryId: "food",
       updatedAt: new Date(Date.now() - 1000),
     })
   );

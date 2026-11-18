@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -61,6 +62,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -68,6 +70,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.data.model.CategoryCatalog
+import com.example.data.model.CategoryItem
 import com.example.data.model.CurrencyFormat
 import com.example.data.model.CurrencyOption
 import com.example.data.model.MarketList
@@ -85,6 +89,7 @@ fun MarketScreen(
   marketLists: List<MarketList>,
   selectedListId: String?,
   selectedItems: List<MarketListItem>,
+  categories: List<CategoryItem>,
   currentUserId: String,
   accountBalances: AccountBalances,
   settings: UserSettings,
@@ -94,11 +99,11 @@ fun MarketScreen(
   onUpdateListAndShare: (list: MarketList, title: String, sharedWithEmail: String, note: String) -> Unit,
   onToggleListCompleted: (listId: String, completed: Boolean) -> Unit,
   onDeleteList: (MarketList) -> Unit,
-  onAddItem: (list: MarketList, name: String, quantity: String, estimatedPrice: Double) -> Unit,
-  onUpdateItem: (listId: String, item: MarketListItem, name: String, quantity: String, estimatedPrice: Double, bought: Boolean) -> Unit,
+  onAddItem: (list: MarketList, name: String, quantity: String, estimatedPrice: Double, categoryId: String) -> Unit,
+  onUpdateItem: (listId: String, item: MarketListItem, name: String, quantity: String, estimatedPrice: Double, categoryId: String, bought: Boolean) -> Unit,
   onToggleItemBought: (listId: String, item: MarketListItem) -> Unit,
   onDeleteItem: (listId: String, itemId: String) -> Unit,
-  onLogAsExpense: (list: MarketList, totalAmount: Double, paymentMethod: PaymentMethod) -> Unit,
+  onLogAsExpense: (list: MarketList, totalAmount: Double, paymentMethod: PaymentMethod, categoryId: String, splitByCategory: Boolean) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val strings = LocalStrings.current
@@ -116,6 +121,7 @@ fun MarketScreen(
     MarketListDetailContent(
       list = selectedList,
       items = selectedItems,
+      categories = categories,
       currentUserId = currentUserId,
       accountBalances = accountBalances,
       currencySymbol = currencySymbol,
@@ -123,13 +129,17 @@ fun MarketScreen(
       onBack = { onSelectList(null) },
       onOpenShareEdit = { editingShareList = selectedList },
       onToggleListCompleted = { onToggleListCompleted(selectedList.id, !selectedList.completed) },
-      onAddItem = { name, qty, price -> onAddItem(selectedList, name, qty, price) },
-      onUpdateItem = { item, name, qty, price ->
-        onUpdateItem(selectedList.id, item, name, qty, price, item.bought)
+      onAddItem = { name, qty, price, categoryId ->
+        onAddItem(selectedList, name, qty, price, categoryId)
+      },
+      onUpdateItem = { item, name, qty, price, categoryId ->
+        onUpdateItem(selectedList.id, item, name, qty, price, categoryId, item.bought)
       },
       onToggleItemBought = { item -> onToggleItemBought(selectedList.id, item) },
       onDeleteItem = { item -> onDeleteItem(selectedList.id, item.id) },
-      onLogAsExpense = { amount, method -> onLogAsExpense(selectedList, amount, method) },
+      onLogAsExpense = { amount, method, categoryId, splitByCategory ->
+        onLogAsExpense(selectedList, amount, method, categoryId, splitByCategory)
+      },
       modifier = modifier,
     )
   } else {
@@ -438,6 +448,7 @@ private fun MarketListSummaryCard(
 private fun MarketListDetailContent(
   list: MarketList,
   items: List<MarketListItem>,
+  categories: List<CategoryItem>,
   currentUserId: String,
   accountBalances: AccountBalances,
   currencySymbol: String,
@@ -445,19 +456,21 @@ private fun MarketListDetailContent(
   onBack: () -> Unit,
   onOpenShareEdit: () -> Unit,
   onToggleListCompleted: () -> Unit,
-  onAddItem: (name: String, quantity: String, estimatedPrice: Double) -> Unit,
-  onUpdateItem: (item: MarketListItem, name: String, quantity: String, estimatedPrice: Double) -> Unit,
+  onAddItem: (name: String, quantity: String, estimatedPrice: Double, categoryId: String) -> Unit,
+  onUpdateItem: (item: MarketListItem, name: String, quantity: String, estimatedPrice: Double, categoryId: String) -> Unit,
   onToggleItemBought: (MarketListItem) -> Unit,
   onDeleteItem: (MarketListItem) -> Unit,
-  onLogAsExpense: (totalAmount: Double, paymentMethod: PaymentMethod) -> Unit,
+  onLogAsExpense: (totalAmount: Double, paymentMethod: PaymentMethod, categoryId: String, splitByCategory: Boolean) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val context = LocalContext.current
   val isOwner = list.ownerUid == currentUserId
+  val categoryMap = remember(categories) { categories.associateBy { it.id } }
 
   var itemName by remember { mutableStateOf("") }
   var itemQty by remember { mutableStateOf("") }
   var itemPriceText by remember { mutableStateOf("") }
+  var selectedItemCategoryId by remember { mutableStateOf("groceries") }
 
   var editingItem by remember { mutableStateOf<MarketListItem?>(null) }
   var showLogExpenseDialog by remember { mutableStateOf(false) }
@@ -676,7 +689,7 @@ private fun MarketListDetailContent(
                 val cleanName = itemName.trim()
                 if (cleanName.isNotEmpty()) {
                   val price = itemPriceText.toDoubleOrNull()?.coerceAtLeast(0.0) ?: 0.0
-                  onAddItem(cleanName, itemQty.trim(), price)
+                  onAddItem(cleanName, itemQty.trim(), price, selectedItemCategoryId)
                   itemName = ""
                   itemQty = ""
                   itemPriceText = ""
@@ -690,6 +703,31 @@ private fun MarketListDetailContent(
               Icon(Icons.Rounded.Add, contentDescription = strings.addItemButton)
             }
           }
+          if (categories.isNotEmpty()) {
+            Text(
+              text = strings.itemCategoryLabel,
+              style = MaterialTheme.typography.labelMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+              items(categories, key = { it.id }) { cat ->
+                FilterChip(
+                  selected = selectedItemCategoryId == cat.id,
+                  onClick = { selectedItemCategoryId = cat.id },
+                  leadingIcon = {
+                    Icon(
+                      imageVector = CategoryCatalog.iconFor(cat.iconKey),
+                      contentDescription = null,
+                      tint = Color(cat.colorHex),
+                      modifier = Modifier.size(16.dp),
+                    )
+                  },
+                  label = { Text(cat.name, maxLines = 1) },
+                  modifier = Modifier.testTag("quick_add_cat_${cat.id}"),
+                )
+              }
+            }
+          }
         }
       }
     }
@@ -698,6 +736,7 @@ private fun MarketListDetailContent(
     items(items, key = { it.id }) { item ->
       MarketItemChecklistRow(
         item = item,
+        category = categoryMap[item.categoryId.ifBlank { "groceries" }],
         currencySymbol = currencySymbol,
         strings = strings,
         onToggleBought = { onToggleItemBought(item) },
@@ -710,11 +749,12 @@ private fun MarketListDetailContent(
   editingItem?.let { target ->
     EditMarketItemDialog(
       item = target,
+      categories = categories,
       currencySymbol = currencySymbol,
       strings = strings,
       onDismiss = { editingItem = null },
-      onConfirm = { newName, newQty, newPrice ->
-        onUpdateItem(target, newName, newQty, newPrice)
+      onConfirm = { newName, newQty, newPrice, newCategoryId ->
+        onUpdateItem(target, newName, newQty, newPrice, newCategoryId)
         editingItem = null
       },
     )
@@ -728,13 +768,15 @@ private fun MarketListDetailContent(
     }
     LogMarketExpenseDialog(
       listTitle = list.title,
+      items = items,
+      categories = categories,
       defaultAmount = defaultTotal,
       accountBalances = accountBalances,
       currencySymbol = currencySymbol,
       strings = strings,
       onDismiss = { showLogExpenseDialog = false },
-      onConfirm = { amt, method ->
-        onLogAsExpense(amt, method)
+      onConfirm = { amt, method, catId, splitByCat ->
+        onLogAsExpense(amt, method, catId, splitByCat)
         showLogExpenseDialog = false
       },
     )
@@ -744,6 +786,7 @@ private fun MarketListDetailContent(
 @Composable
 private fun MarketItemChecklistRow(
   item: MarketListItem,
+  category: CategoryItem?,
   currencySymbol: String,
   strings: AppStrings,
   onToggleBought: () -> Unit,
@@ -776,7 +819,10 @@ private fun MarketItemChecklistRow(
         onCheckedChange = { onToggleBought() },
         modifier = Modifier.testTag("market_item_check_${item.id}"),
       )
-      Column(modifier = Modifier.weight(1f)) {
+      Column(
+        modifier = Modifier.weight(1f),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+      ) {
         Text(
           text = item.name,
           style = MaterialTheme.typography.titleMedium,
@@ -785,17 +831,50 @@ private fun MarketItemChecklistRow(
           maxLines = 2,
           overflow = TextOverflow.Ellipsis,
         )
-        val metaParts = buildList {
-          if (item.quantity.isNotBlank()) add(item.quantity)
-          if (item.estimatedPrice > 0.0) add(CurrencyFormat.format(item.estimatedPrice, currencySymbol))
-        }
-        if (metaParts.isNotEmpty()) {
-          Text(
-            text = metaParts.joinToString(" • "),
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = HisabMonoFontFamily,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+          if (category != null) {
+            val catColor = Color(category.colorHex)
+            Surface(
+              color = catColor.copy(alpha = 0.12f),
+              shape = RoundedCornerShape(8.dp),
+            ) {
+              Row(
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+              ) {
+                Icon(
+                  imageVector = CategoryCatalog.iconFor(category.iconKey),
+                  contentDescription = null,
+                  tint = catColor,
+                  modifier = Modifier.size(12.dp),
+                )
+                Text(
+                  text = category.name,
+                  style = MaterialTheme.typography.labelSmall,
+                  color = catColor,
+                  maxLines = 1,
+                )
+              }
+            }
+          }
+          val metaParts = buildList {
+            if (item.quantity.isNotBlank()) add(item.quantity)
+            if (item.estimatedPrice > 0.0) add(CurrencyFormat.format(item.estimatedPrice, currencySymbol))
+          }
+          if (metaParts.isNotEmpty()) {
+            Text(
+              text = metaParts.joinToString(" • "),
+              style = MaterialTheme.typography.bodySmall,
+              fontFamily = HisabMonoFontFamily,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+            )
+          }
         }
       }
       IconButton(onClick = onEdit, modifier = Modifier.testTag("edit_market_item_${item.id}")) {
@@ -901,13 +980,17 @@ private fun MarketListEditorDialog(
 @Composable
 private fun EditMarketItemDialog(
   item: MarketListItem,
+  categories: List<CategoryItem>,
   currencySymbol: String,
   strings: AppStrings,
   onDismiss: () -> Unit,
-  onConfirm: (name: String, quantity: String, estimatedPrice: Double) -> Unit,
+  onConfirm: (name: String, quantity: String, estimatedPrice: Double, categoryId: String) -> Unit,
 ) {
   var name by remember(item.id) { mutableStateOf(item.name) }
   var qty by remember(item.id) { mutableStateOf(item.quantity) }
+  var selectedCategoryId by remember(item.id) {
+    mutableStateOf(item.categoryId.ifBlank { "groceries" })
+  }
   var priceText by remember(item.id) {
     mutableStateOf(
       if (item.estimatedPrice > 0.0) {
@@ -921,7 +1004,12 @@ private fun EditMarketItemDialog(
     onDismissRequest = onDismiss,
     title = { Text(strings.editItemTitle) },
     text = {
-      Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+      ) {
         OutlinedTextField(
           value = name,
           onValueChange = { if (it.length <= 120) name = it },
@@ -947,6 +1035,31 @@ private fun EditMarketItemDialog(
           singleLine = true,
           modifier = Modifier.fillMaxWidth(),
         )
+        if (categories.isNotEmpty()) {
+          Text(
+            text = strings.itemCategoryLabel,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+          LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(categories, key = { it.id }) { cat ->
+              FilterChip(
+                selected = selectedCategoryId == cat.id,
+                onClick = { selectedCategoryId = cat.id },
+                leadingIcon = {
+                  Icon(
+                    imageVector = CategoryCatalog.iconFor(cat.iconKey),
+                    contentDescription = null,
+                    tint = Color(cat.colorHex),
+                    modifier = Modifier.size(16.dp),
+                  )
+                },
+                label = { Text(cat.name, maxLines = 1) },
+                modifier = Modifier.testTag("edit_item_cat_${cat.id}"),
+              )
+            }
+          }
+        }
       }
     },
     confirmButton = {
@@ -957,6 +1070,7 @@ private fun EditMarketItemDialog(
               name.trim(),
               qty.trim(),
               priceText.toDoubleOrNull()?.coerceAtLeast(0.0) ?: 0.0,
+              selectedCategoryId,
             )
           }
         },
@@ -975,13 +1089,37 @@ private fun EditMarketItemDialog(
 @Composable
 private fun LogMarketExpenseDialog(
   listTitle: String,
+  items: List<MarketListItem>,
+  categories: List<CategoryItem>,
   defaultAmount: Double,
   accountBalances: AccountBalances,
   currencySymbol: String,
   strings: AppStrings,
   onDismiss: () -> Unit,
-  onConfirm: (amount: Double, paymentMethod: PaymentMethod) -> Unit,
+  onConfirm: (amount: Double, paymentMethod: PaymentMethod, categoryId: String, splitByCategory: Boolean) -> Unit,
 ) {
+  val catMap = remember(categories) { categories.associateBy { it.id } }
+  val activeItems = remember(items) { items.filter { it.bought }.ifEmpty { items } }
+  val categoryBuckets = remember(activeItems) {
+    activeItems
+      .filter { it.estimatedPrice > 0.0 }
+      .groupBy { it.categoryId.ifBlank { "groceries" } }
+  }
+  val hasMultiplePricedCategories = categoryBuckets.size > 1
+  val splitSumTotal = remember(categoryBuckets) {
+    categoryBuckets.values.sumOf { bucket -> bucket.sumOf { it.estimatedPrice } }
+  }
+
+  var splitByCategory by remember(hasMultiplePricedCategories) {
+    mutableStateOf(hasMultiplePricedCategories)
+  }
+  var selectedCategoryId by remember(categoryBuckets, activeItems) {
+    mutableStateOf(
+      categoryBuckets.keys.firstOrNull()
+        ?: activeItems.firstOrNull()?.categoryId?.ifBlank { "groceries" }
+        ?: "groceries"
+    )
+  }
   var amountText by remember(defaultAmount) {
     mutableStateOf(
       if (defaultAmount > 0.0) {
@@ -1008,23 +1146,142 @@ private fun LogMarketExpenseDialog(
           style = MaterialTheme.typography.titleMedium,
           fontWeight = FontWeight.SemiBold,
         )
-        OutlinedTextField(
-          value = amountText,
-          onValueChange = { inp ->
-            val filtered = inp.filter { it.isDigit() || it == '.' }
-            if (filtered.count { it == '.' } <= 1) {
-              amountText = filtered
-              validationError = null
+
+        if (hasMultiplePricedCategories) {
+          FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+              selected = splitByCategory,
+              onClick = {
+                splitByCategory = true
+                validationError = null
+              },
+              label = { Text(strings.splitByCategoryOption) },
+              modifier = Modifier.testTag("split_by_category_chip"),
+            )
+            FilterChip(
+              selected = !splitByCategory,
+              onClick = {
+                splitByCategory = false
+                validationError = null
+              },
+              label = { Text(strings.singleCategoryOption) },
+              modifier = Modifier.testTag("single_category_chip"),
+            )
+          }
+        }
+
+        if (splitByCategory && hasMultiplePricedCategories) {
+          Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            Column(
+              modifier = Modifier.padding(12.dp),
+              verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+              categoryBuckets.forEach { (catId, bucketItems) ->
+                val cat = catMap[catId]
+                val catName = cat?.name ?: catId
+                val bucketSum = bucketItems.sumOf { it.estimatedPrice }
+                Row(
+                  modifier = Modifier.fillMaxWidth(),
+                  horizontalArrangement = Arrangement.SpaceBetween,
+                  verticalAlignment = Alignment.CenterVertically,
+                ) {
+                  Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                  ) {
+                    Icon(
+                      imageVector = CategoryCatalog.iconFor(cat?.iconKey ?: "other"),
+                      contentDescription = null,
+                      tint = Color(cat?.colorHex ?: 0xFF0891B2),
+                      modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                      text = "$catName (${bucketItems.size})",
+                      style = MaterialTheme.typography.bodyMedium,
+                      maxLines = 1,
+                      overflow = TextOverflow.Ellipsis,
+                    )
+                  }
+                  Text(
+                    text = CurrencyFormat.format(bucketSum, currencySymbol),
+                    fontFamily = HisabMonoFontFamily,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                  )
+                }
+              }
+              Row(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+              ) {
+                Text(
+                  text = strings.estimatedTotalLabel,
+                  style = MaterialTheme.typography.labelLarge,
+                  fontWeight = FontWeight.Bold,
+                )
+                Text(
+                  text = CurrencyFormat.format(splitSumTotal, currencySymbol),
+                  fontFamily = HisabMonoFontFamily,
+                  style = MaterialTheme.typography.titleMedium,
+                  fontWeight = FontWeight.Bold,
+                  color = MaterialTheme.colorScheme.primary,
+                )
+              }
             }
-          },
-          label = { Text("${strings.amountLabel} ($currencySymbol)") },
-          textStyle = MaterialTheme.typography.titleLarge.copy(fontFamily = HisabMonoFontFamily),
-          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-          singleLine = true,
-          modifier = Modifier
-            .fillMaxWidth()
-            .testTag("log_market_amount_input"),
-        )
+          }
+        } else {
+          OutlinedTextField(
+            value = amountText,
+            onValueChange = { inp ->
+              val filtered = inp.filter { it.isDigit() || it == '.' }
+              if (filtered.count { it == '.' } <= 1) {
+                amountText = filtered
+                validationError = null
+              }
+            },
+            label = { Text("${strings.amountLabel} ($currencySymbol)") },
+            textStyle = MaterialTheme.typography.titleLarge.copy(fontFamily = HisabMonoFontFamily),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            singleLine = true,
+            modifier = Modifier
+              .fillMaxWidth()
+              .testTag("log_market_amount_input"),
+          )
+          if (categories.isNotEmpty()) {
+            Text(
+              text = strings.categoryLabel,
+              style = MaterialTheme.typography.labelLarge,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+              items(categories, key = { it.id }) { cat ->
+                FilterChip(
+                  selected = selectedCategoryId == cat.id,
+                  onClick = { selectedCategoryId = cat.id },
+                  leadingIcon = {
+                    Icon(
+                      imageVector = CategoryCatalog.iconFor(cat.iconKey),
+                      contentDescription = null,
+                      tint = Color(cat.colorHex),
+                      modifier = Modifier.size(16.dp),
+                    )
+                  },
+                  label = { Text(cat.name, maxLines = 1) },
+                  modifier = Modifier.testTag("log_market_cat_${cat.id}"),
+                )
+              }
+            }
+          }
+        }
+
         Text(
           text = strings.paymentMethodLabel,
           style = MaterialTheme.typography.labelLarge,
@@ -1058,12 +1315,20 @@ private fun LogMarketExpenseDialog(
     confirmButton = {
       Button(
         onClick = {
-          val amt = amountText.toDoubleOrNull() ?: 0.0
-          if (amt <= 0.0 || amt > 1_000_000_000.0) {
-            validationError = strings.invalidInputError
-            return@Button
+          if (splitByCategory && hasMultiplePricedCategories) {
+            if (splitSumTotal <= 0.0 || splitSumTotal > 1_000_000_000.0) {
+              validationError = strings.invalidInputError
+              return@Button
+            }
+            onConfirm(splitSumTotal, selectedMethod, selectedCategoryId, true)
+          } else {
+            val amt = amountText.toDoubleOrNull() ?: 0.0
+            if (amt <= 0.0 || amt > 1_000_000_000.0) {
+              validationError = strings.invalidInputError
+              return@Button
+            }
+            onConfirm(amt, selectedMethod, selectedCategoryId, false)
           }
-          onConfirm(amt, selectedMethod)
         },
         modifier = Modifier.testTag("confirm_log_market_expense_btn"),
       ) {

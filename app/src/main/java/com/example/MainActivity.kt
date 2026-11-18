@@ -500,6 +500,7 @@ private fun AuthenticatedHisabApp(
                   marketLists = marketLists,
                   selectedListId = selectedMarketListId,
                   selectedItems = selectedMarketItems,
+                  categories = categories,
                   currentUserId = currentUser.uid,
                   accountBalances = accountBalances,
                   settings = settings,
@@ -509,11 +510,23 @@ private fun AuthenticatedHisabApp(
                   onUpdateListAndShare = viewModel::updateMarketListAndShare,
                   onToggleListCompleted = viewModel::toggleMarketListCompleted,
                   onDeleteList = viewModel::deleteMarketList,
-                  onAddItem = viewModel::addMarketItem,
-                  onUpdateItem = viewModel::updateMarketItem,
+                  onAddItem = { list, name, qty, price, categoryId ->
+                    viewModel.addMarketItem(list, name, qty, price, categoryId)
+                  },
+                  onUpdateItem = { listId, item, name, qty, price, categoryId, bought ->
+                    viewModel.updateMarketItem(listId, item, name, qty, price, categoryId, bought)
+                  },
                   onToggleItemBought = viewModel::toggleMarketItemBought,
                   onDeleteItem = viewModel::deleteMarketItem,
-                  onLogAsExpense = viewModel::logMarketListAsExpense,
+                  onLogAsExpense = { list, amount, method, categoryId, splitByCategory ->
+                    viewModel.logMarketListAsExpense(
+                      list = list,
+                      totalAmount = amount,
+                      paymentMethod = method,
+                      categoryId = categoryId,
+                      splitByCategory = splitByCategory,
+                    )
+                  },
                 )
               }
 

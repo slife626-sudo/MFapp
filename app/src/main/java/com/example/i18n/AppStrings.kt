@@ -265,6 +265,10 @@ data class AppStrings(
   val completedBadge: String,
   val activeBadge: String,
   val sharedListSavedMsg: String,
+  val splitByCategoryOption: String,
+  val singleCategoryOption: String,
+  val marketSplitExpenseSaved: String,
+  val itemCategoryLabel: String,
 )
 
 val BengaliStrings = AppStrings(
@@ -519,6 +523,10 @@ val BengaliStrings = AppStrings(
   completedBadge = "সম্পন্ন",
   activeBadge = "চলমান",
   sharedListSavedMsg = "বাজার লিস্ট শেয়ার আপডেট হয়েছে",
+  splitByCategoryOption = "ক্যাটাগরি অনুযায়ী আলাদা সেভ করুন",
+  singleCategoryOption = "একটি ক্যাটাগরিতে মোট সেভ করুন",
+  marketSplitExpenseSaved = "ক্যাটাগরি অনুযায়ী সবগুলো খরচ সেভ হয়েছে!",
+  itemCategoryLabel = "ক্যাটাগরি",
 )
 
 val EnglishStrings = AppStrings(
@@ -773,6 +781,10 @@ val EnglishStrings = AppStrings(
   completedBadge = "Done",
   activeBadge = "Active",
   sharedListSavedMsg = "Market list sharing updated",
+  splitByCategoryOption = "Split into separate category expenses",
+  singleCategoryOption = "Save total under one category",
+  marketSplitExpenseSaved = "Saved expenses across categories!",
+  itemCategoryLabel = "Category",
 )
 
 val HindiStrings = AppStrings(
@@ -1027,6 +1039,10 @@ val HindiStrings = AppStrings(
   completedBadge = "पूर्ण",
   activeBadge = "सक्रिय",
   sharedListSavedMsg = "बाज़ार लिस्ट शेयरिंग अपडेट हुई",
+  splitByCategoryOption = "श्रेणी के अनुसार अलग-अलग खर्च सहेजें",
+  singleCategoryOption = "एक ही श्रेणी में कुल खर्च सहेजें",
+  marketSplitExpenseSaved = "सभी श्रेणियों में खर्च सहेजा गया!",
+  itemCategoryLabel = "श्रेणी",
 )
 
 fun stringsFor(language: AppLanguage): AppStrings = when (language) {
