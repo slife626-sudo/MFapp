@@ -271,6 +271,116 @@ interface AppStrings {
   val singleCategoryOption: String
   val marketSplitExpenseSaved: String
   val itemCategoryLabel: String
+  val navDashboard: String
+  val navTransactions: String
+  val navExpensesList: String
+  val navIncomesList: String
+  val navAccounts: String
+  val navCategories: String
+  val navLoansDebts: String
+  val navLedger: String
+  val navTrialBalance: String
+  val navTrash: String
+  val drawerSectionMain: String
+  val drawerSectionLoans: String
+  val drawerSectionReports: String
+  val drawerSectionSettings: String
+  val periodThisMonth: String
+  val periodLastMonth: String
+  val periodThisQuarter: String
+  val periodThisYear: String
+  val periodCustomMonth: String
+  val todaysActivityTitle: String
+  val netCashFlowTitle: String
+  val surplusLabel: String
+  val deficitLabel: String
+  val incomeVsExpenseTitle: String
+  val barChartLabel: String
+  val lineChartLabel: String
+  val recentTransactionsTitle: String
+  val viewAllButton: String
+  val netIncomeLabel: String
+  val totalIncomeLabel: String
+  val savingsRateLabel: String
+  val topCategoriesTitle: String
+  val catSalary: String
+  val catBusiness: String
+  val catInvestment: String
+  val catOtherIncome: String
+  val categoryTypeLabel: String
+  val expenseCategoryType: String
+  val incomeCategoryType: String
+  val customBadge: String
+  val allFilterTab: String
+  val singleModeTab: String
+  val multipleModeTab: String
+  val savedBadgeCount: String
+  val addAnotherHint: String
+  val timeLabel: String
+  val dueDateOptionalLabel: String
+  val clearDueDate: String
+  val titleOptionalHint: String
+  val selectAccountLabel: String
+  val accountsLabel: String
+  val addAccountButton: String
+  val editAccountTitle: String
+  val accountNameLabel: String
+  val accountTypeLabel: String
+  val openingBalanceLabel: String
+  val presetsLabel: String
+  val confirmDeleteAccountTitle: String
+  val confirmDeleteAccountMessage: String
+  val searchIconsHint: String
+  val customHexHint: String
+  val sortLabel: String
+  val sortNewest: String
+  val sortOldest: String
+  val sortAmountHigh: String
+  val sortAmountLow: String
+  val selectedCountLabel: String
+  val bulkDeleteButton: String
+  val loadMoreButton: String
+  val overdueBadge: String
+  val overdueCountLabel: String
+  val partialBadge: String
+  val unpaidBadge: String
+  val dueDateLabel: String
+  val allAccountsOption: String
+  val receiptsLabel: String
+  val paymentsLabel: String
+  val netChangeLabel: String
+  val closingBalanceLabel: String
+  val runningBalanceLabel: String
+  val exportLedgerCsv: String
+  val exportTrialBalanceCsv: String
+  val balancedBadge: String
+  val unbalancedBadge: String
+  val debitLabel: String
+  val creditLabel: String
+  val assetsSection: String
+  val liabilitiesSection: String
+  val revenueSection: String
+  val operatingExpensesSection: String
+  val trashEmptyTitle: String
+  val trashEmptyBody: String
+  val restoreButton: String
+  val deleteForeverButton: String
+  val emptyTrashButton: String
+  val daysRemainingSuffix: String
+  val restoredMessage: String
+  val movedToTrashMessage: String
+  val displayPreferencesSection: String
+  val showNotesInListLabel: String
+  val use24HourTimeLabel: String
+  val itemsPerPageLabel: String
+  val allItemsLabel: String
+  val blurBalancesLabel: String
+  val hapticFeedbackLabel: String
+  val dangerZoneSection: String
+  val clearAllDataButton: String
+  val confirmClearAllTitle: String
+  val confirmClearAllMessage: String
+  val allDataClearedMessage: String
 }
 
 object BengaliStrings : AppStrings {
@@ -529,6 +639,116 @@ object BengaliStrings : AppStrings {
   override val singleCategoryOption = "একটি ক্যাটাগরিতে মোট সেভ করুন"
   override val marketSplitExpenseSaved = "ক্যাটাগরি অনুযায়ী সবগুলো খরচ সেভ হয়েছে!"
   override val itemCategoryLabel = "ক্যাটাগরি"
+  override val navDashboard = "ড্যাশবোর্ড"
+  override val navTransactions = "লেনদেন"
+  override val navExpensesList = "খরচসমূহ"
+  override val navIncomesList = "আয়সমূহ"
+  override val navAccounts = "অ্যাকাউন্ট"
+  override val navCategories = "ক্যাটাগরি"
+  override val navLoansDebts = "ধার ও দেনা-পাওনা"
+  override val navLedger = "খতিয়ান (Ledger)"
+  override val navTrialBalance = "রেওয়ামিল (Trial Balance)"
+  override val navTrash = "ট্র্যাশ (৩০ দিন)"
+  override val drawerSectionMain = "প্রধান মেনু"
+  override val drawerSectionLoans = "ঋণ ও লেনদেন"
+  override val drawerSectionReports = "রিপোর্ট ও হিসাব"
+  override val drawerSectionSettings = "সেটিংস ও ডাটা"
+  override val periodThisMonth = "এই মাস"
+  override val periodLastMonth = "গত মাস"
+  override val periodThisQuarter = "এই ত্রৈমাসিক"
+  override val periodThisYear = "এই বছর"
+  override val periodCustomMonth = "নির্দিষ্ট মাস"
+  override val todaysActivityTitle = "আজকের হিসাব"
+  override val netCashFlowTitle = "নেট ক্যাশ ফ্লো"
+  override val surplusLabel = "উদ্বৃত্ত"
+  override val deficitLabel = "ঘাটতি"
+  override val incomeVsExpenseTitle = "আয় বনাম খরচ"
+  override val barChartLabel = "বার"
+  override val lineChartLabel = "লাইন"
+  override val recentTransactionsTitle = "সাম্প্রতিক লেনদেন"
+  override val viewAllButton = "সব দেখুন"
+  override val netIncomeLabel = "নেট আয়"
+  override val totalIncomeLabel = "মোট আয়"
+  override val savingsRateLabel = "সঞ্চয় হার"
+  override val topCategoriesTitle = "শীর্ষ ক্যাটাগরি"
+  override val catSalary = "বেতন"
+  override val catBusiness = "ব্যবসা"
+  override val catInvestment = "বিনিয়োগ ও মুনাফা"
+  override val catOtherIncome = "অন্যান্য আয়"
+  override val categoryTypeLabel = "ক্যাটাগরির ধরন"
+  override val expenseCategoryType = "খরচের"
+  override val incomeCategoryType = "আয়ের"
+  override val customBadge = "কাস্টম"
+  override val allFilterTab = "সব"
+  override val singleModeTab = "একটি"
+  override val multipleModeTab = "একাধিক (ব্যাচ)"
+  override val savedBadgeCount = "টি সেভ হয়েছে"
+  override val addAnotherHint = "সেভ করে পরবর্তী এন্ট্রি লিখুন"
+  override val timeLabel = "সময়"
+  override val dueDateOptionalLabel = "পরিশোধের সম্ভাব্য তারিখ (ঐচ্ছিক)"
+  override val clearDueDate = "তারিখ মুছুন"
+  override val titleOptionalHint = "খালি রাখলে ক্যাটাগরির নাম বসবে"
+  override val selectAccountLabel = "অ্যাকাউন্ট নির্বাচন"
+  override val accountsLabel = "অ্যাকাউন্ট"
+  override val addAccountButton = "নতুন অ্যাকাউন্ট"
+  override val editAccountTitle = "অ্যাকাউন্ট সম্পাদনা"
+  override val accountNameLabel = "অ্যাকাউন্টের নাম (যেমন: DBBL, বিকাশ)"
+  override val accountTypeLabel = "অ্যাকাউন্টের ধরন"
+  override val openingBalanceLabel = "শুরুর ব্যালেন্স (Opening Balance)"
+  override val presetsLabel = "দ্রুত প্রিসেট"
+  override val confirmDeleteAccountTitle = "অ্যাকাউন্ট মুছে ফেলবেন?"
+  override val confirmDeleteAccountMessage = "এই কাস্টম অ্যাকাউন্টটি মুছে যাবে (আগের লেনদেন মূল চ্যানেলে থাকবে)।"
+  override val searchIconsHint = "আইকন খুঁজুন..."
+  override val customHexHint = "হেক্স কোড (যেমন 0E7C5B)"
+  override val sortLabel = "সাজান"
+  override val sortNewest = "নতুন আগে"
+  override val sortOldest = "পুরোনো আগে"
+  override val sortAmountHigh = "বেশি টাকা"
+  override val sortAmountLow = "কম টাকা"
+  override val selectedCountLabel = "টি নির্বাচিত"
+  override val bulkDeleteButton = "মুছে ফেলুন"
+  override val loadMoreButton = "আরও দেখুন"
+  override val overdueBadge = "মেয়াদোত্তীর্ণ"
+  override val overdueCountLabel = "মেয়াদোত্তীর্ণ"
+  override val partialBadge = "আংশিক"
+  override val unpaidBadge = "বাকি"
+  override val dueDateLabel = "শেষ তারিখ"
+  override val allAccountsOption = "সব অ্যাকাউন্ট"
+  override val receiptsLabel = "জমা (Receipts)"
+  override val paymentsLabel = "খরচ (Payments)"
+  override val netChangeLabel = "নেট পরিবর্তন"
+  override val closingBalanceLabel = "সমাপনী ব্যালেন্স"
+  override val runningBalanceLabel = "চলমান ব্যালেন্স"
+  override val exportLedgerCsv = "খতিয়ান CSV"
+  override val exportTrialBalanceCsv = "রেওয়ামিল CSV"
+  override val balancedBadge = "সমন্বিত (Balanced)"
+  override val unbalancedBadge = "অসমন্বিত"
+  override val debitLabel = "ডেবিট (Debit)"
+  override val creditLabel = "ক্রেডিট (Credit)"
+  override val assetsSection = "সম্পদ ও নগদ (Assets)"
+  override val liabilitiesSection = "দেনা ও মূলধন (Liabilities & Equity)"
+  override val revenueSection = "আয় (Revenue)"
+  override val operatingExpensesSection = "পরিচালন খরচ (Expenses)"
+  override val trashEmptyTitle = "ট্র্যাশ খালি আছে"
+  override val trashEmptyBody = "মুছে ফেলা লেনদেন এখানে ৩০ দিন সংরক্ষিত থাকে।"
+  override val restoreButton = "ফিরিয়ে আনুন"
+  override val deleteForeverButton = "স্থায়ীভাবে মুছুন"
+  override val emptyTrashButton = "ট্র্যাশ খালি করুন"
+  override val daysRemainingSuffix = "দিন বাকি"
+  override val restoredMessage = "সফলভাবে ফিরিয়ে আনা হয়েছে"
+  override val movedToTrashMessage = "ট্র্যাশে সরানো হয়েছে"
+  override val displayPreferencesSection = "অ্যাপ পছন্দসমূহ ও প্রাইভেসি"
+  override val showNotesInListLabel = "তালিকায় নোট দেখান"
+  override val use24HourTimeLabel = "২৪-ঘণ্টা সময় ফরম্যাট"
+  override val itemsPerPageLabel = "প্রতি পেজে আইটেম"
+  override val allItemsLabel = "সব"
+  override val blurBalancesLabel = "ব্যালেন্স গোপন রাখুন (Blur)"
+  override val hapticFeedbackLabel = "ভাইব্রেশন ফিডব্যাক"
+  override val dangerZoneSection = "বিপজ্জনক অঞ্চল (Danger Zone)"
+  override val clearAllDataButton = "সব ডাটা মুছে ফেলুন"
+  override val confirmClearAllTitle = "সব ডাটা স্থায়ীভাবে মুছবেন?"
+  override val confirmClearAllMessage = "আপনার সব খরচ, আয়, অ্যাকাউন্ট, দেনা-পাওনা, বাজেট ও ট্র্যাশ চিরতরে মুছে যাবে। আগে ব্যাকআপ নিয়ে নিতে পারেন।"
+  override val allDataClearedMessage = "সব ডাটা মুছে ফেলা হয়েছে"
 }
 
 object EnglishStrings : AppStrings {
@@ -787,6 +1007,116 @@ object EnglishStrings : AppStrings {
   override val singleCategoryOption = "Save total under one category"
   override val marketSplitExpenseSaved = "Saved expenses across categories!"
   override val itemCategoryLabel = "Category"
+  override val navDashboard = "Dashboard"
+  override val navTransactions = "Transactions"
+  override val navExpensesList = "Expenses"
+  override val navIncomesList = "Incomes"
+  override val navAccounts = "Accounts"
+  override val navCategories = "Categories"
+  override val navLoansDebts = "Loans & Debts"
+  override val navLedger = "Account Ledger"
+  override val navTrialBalance = "Trial Balance"
+  override val navTrash = "Trash (30 Days)"
+  override val drawerSectionMain = "Main"
+  override val drawerSectionLoans = "Debts & Loans"
+  override val drawerSectionReports = "Reports & Accounting"
+  override val drawerSectionSettings = "Settings & Data"
+  override val periodThisMonth = "This Month"
+  override val periodLastMonth = "Last Month"
+  override val periodThisQuarter = "This Quarter"
+  override val periodThisYear = "This Year"
+  override val periodCustomMonth = "Custom Month"
+  override val todaysActivityTitle = "Today's Activity"
+  override val netCashFlowTitle = "Net Cash Flow"
+  override val surplusLabel = "Surplus"
+  override val deficitLabel = "Deficit"
+  override val incomeVsExpenseTitle = "Income vs Expense"
+  override val barChartLabel = "Bar"
+  override val lineChartLabel = "Line"
+  override val recentTransactionsTitle = "Recent Transactions"
+  override val viewAllButton = "View All"
+  override val netIncomeLabel = "Net Income"
+  override val totalIncomeLabel = "Total Income"
+  override val savingsRateLabel = "Savings Rate"
+  override val topCategoriesTitle = "Top Categories"
+  override val catSalary = "Salary"
+  override val catBusiness = "Business"
+  override val catInvestment = "Investment"
+  override val catOtherIncome = "Other Income"
+  override val categoryTypeLabel = "Category Type"
+  override val expenseCategoryType = "Expense"
+  override val incomeCategoryType = "Income"
+  override val customBadge = "Custom"
+  override val allFilterTab = "All"
+  override val singleModeTab = "Single"
+  override val multipleModeTab = "Multiple"
+  override val savedBadgeCount = "saved"
+  override val addAnotherHint = "Save & enter next item"
+  override val timeLabel = "Time"
+  override val dueDateOptionalLabel = "Due Date (optional)"
+  override val clearDueDate = "Clear"
+  override val titleOptionalHint = "Leave blank to use category name"
+  override val selectAccountLabel = "Select Account"
+  override val accountsLabel = "Account"
+  override val addAccountButton = "Add Account"
+  override val editAccountTitle = "Edit Account"
+  override val accountNameLabel = "Account Name (e.g., Savings, bKash)"
+  override val accountTypeLabel = "Account Type"
+  override val openingBalanceLabel = "Opening Balance"
+  override val presetsLabel = "Quick Presets"
+  override val confirmDeleteAccountTitle = "Delete Account?"
+  override val confirmDeleteAccountMessage = "This custom account will be deleted (existing transactions remain under its channel)."
+  override val searchIconsHint = "Search icons..."
+  override val customHexHint = "Custom Hex (e.g., 0E7C5B)"
+  override val sortLabel = "Sort"
+  override val sortNewest = "Newest"
+  override val sortOldest = "Oldest"
+  override val sortAmountHigh = "Highest"
+  override val sortAmountLow = "Lowest"
+  override val selectedCountLabel = "selected"
+  override val bulkDeleteButton = "Delete Selected"
+  override val loadMoreButton = "Load More"
+  override val overdueBadge = "Overdue"
+  override val overdueCountLabel = "Overdue"
+  override val partialBadge = "Partial"
+  override val unpaidBadge = "Unpaid"
+  override val dueDateLabel = "Due"
+  override val allAccountsOption = "All Accounts"
+  override val receiptsLabel = "Receipts"
+  override val paymentsLabel = "Payments"
+  override val netChangeLabel = "Net Change"
+  override val closingBalanceLabel = "Closing Balance"
+  override val runningBalanceLabel = "Balance"
+  override val exportLedgerCsv = "Export Ledger CSV"
+  override val exportTrialBalanceCsv = "Export Trial Balance CSV"
+  override val balancedBadge = "Balanced"
+  override val unbalancedBadge = "Unbalanced"
+  override val debitLabel = "Debit"
+  override val creditLabel = "Credit"
+  override val assetsSection = "Assets & Cash"
+  override val liabilitiesSection = "Liabilities & Equity"
+  override val revenueSection = "Revenue"
+  override val operatingExpensesSection = "Operating Expenses"
+  override val trashEmptyTitle = "Trash is Empty"
+  override val trashEmptyBody = "Deleted records remain here for 30 days before permanent removal."
+  override val restoreButton = "Restore"
+  override val deleteForeverButton = "Delete Forever"
+  override val emptyTrashButton = "Empty Trash"
+  override val daysRemainingSuffix = "days left"
+  override val restoredMessage = "Restored successfully"
+  override val movedToTrashMessage = "Moved to Trash"
+  override val displayPreferencesSection = "Preferences & Privacy"
+  override val showNotesInListLabel = "Show Notes in List"
+  override val use24HourTimeLabel = "24-Hour Time Format"
+  override val itemsPerPageLabel = "Items Per Page"
+  override val allItemsLabel = "All"
+  override val blurBalancesLabel = "Hide / Blur Balances"
+  override val hapticFeedbackLabel = "Haptic Feedback"
+  override val dangerZoneSection = "Danger Zone"
+  override val clearAllDataButton = "Clear All Data"
+  override val confirmClearAllTitle = "Clear All Financial Data?"
+  override val confirmClearAllMessage = "This permanently erases all expenses, incomes, accounts, loans, budgets, and trash. Consider exporting a backup first."
+  override val allDataClearedMessage = "All data cleared"
 }
 
 object HindiStrings : AppStrings {
@@ -1045,6 +1375,116 @@ object HindiStrings : AppStrings {
   override val singleCategoryOption = "एक ही श्रेणी में कुल खर्च सहेजें"
   override val marketSplitExpenseSaved = "सभी श्रेणियों में खर्च सहेजा गया!"
   override val itemCategoryLabel = "श्रेणी"
+  override val navDashboard = "डैशबोर्ड"
+  override val navTransactions = "लेन-देन"
+  override val navExpensesList = "खर्च"
+  override val navIncomesList = "आय"
+  override val navAccounts = "खाते"
+  override val navCategories = "श्रेणियां"
+  override val navLoansDebts = "कर्ज और देनदारी"
+  override val navLedger = "खाता बही (Ledger)"
+  override val navTrialBalance = "ट्रायल बैलेंस"
+  override val navTrash = "ट्रैश (30 दिन)"
+  override val drawerSectionMain = "मुख्य"
+  override val drawerSectionLoans = "कर्ज और लेन-देन"
+  override val drawerSectionReports = "रिपोर्ट और लेखांकन"
+  override val drawerSectionSettings = "सेटिंग्स और डेटा"
+  override val periodThisMonth = "इस माह"
+  override val periodLastMonth = "पिछला माह"
+  override val periodThisQuarter = "इस तिमाही"
+  override val periodThisYear = "इस वर्ष"
+  override val periodCustomMonth = "कस्टम माह"
+  override val todaysActivityTitle = "आज की गतिविधि"
+  override val netCashFlowTitle = "नेट कैश फ्लो"
+  override val surplusLabel = "अधिशेष"
+  override val deficitLabel = "घाटा"
+  override val incomeVsExpenseTitle = "आय बनाम खर्च"
+  override val barChartLabel = "बार"
+  override val lineChartLabel = "लाइन"
+  override val recentTransactionsTitle = "हाल के लेन-देन"
+  override val viewAllButton = "सभी देखें"
+  override val netIncomeLabel = "शुद्ध आय"
+  override val totalIncomeLabel = "कुल आय"
+  override val savingsRateLabel = "बचत दर"
+  override val topCategoriesTitle = "शीर्ष श्रेणियां"
+  override val catSalary = "वेतन"
+  override val catBusiness = "व्यापार"
+  override val catInvestment = "निवेश"
+  override val catOtherIncome = "अन्य आय"
+  override val categoryTypeLabel = "श्रेणी प्रकार"
+  override val expenseCategoryType = "खर्च"
+  override val incomeCategoryType = "आय"
+  override val customBadge = "कस्टम"
+  override val allFilterTab = "सभी"
+  override val singleModeTab = "एकल"
+  override val multipleModeTab = "एकाधिक"
+  override val savedBadgeCount = "सहेजे गए"
+  override val addAnotherHint = "सहेजें और अगली प्रविष्टि जोड़ें"
+  override val timeLabel = "समय"
+  override val dueDateOptionalLabel = "नियत तारीख (वैकल्पिक)"
+  override val clearDueDate = "हटाएं"
+  override val titleOptionalHint = "खाली छोड़ने पर श्रेणी नाम रहेगा"
+  override val selectAccountLabel = "खाता चुनें"
+  override val accountsLabel = "खाता"
+  override val addAccountButton = "नया खाता"
+  override val editAccountTitle = "खाता संपादित करें"
+  override val accountNameLabel = "खाते का नाम (जैसे: बचत, मोबाइल पे)"
+  override val accountTypeLabel = "खाते का प्रकार"
+  override val openingBalanceLabel = "प्रारंभिक शेष"
+  override val presetsLabel = "त्वरित प्रीसेट"
+  override val confirmDeleteAccountTitle = "खाता हटाएं?"
+  override val confirmDeleteAccountMessage = "यह कस्टम खाता हट जाएगा (पुराने लेन-देन मूल माध्यम में रहेंगे)।"
+  override val searchIconsHint = "आइकन खोजें..."
+  override val customHexHint = "कस्टम हेक्स (जैसे 0E7C5B)"
+  override val sortLabel = "क्रम"
+  override val sortNewest = "नवीनतम"
+  override val sortOldest = "सबसे पुराना"
+  override val sortAmountHigh = "अधिक राशि"
+  override val sortAmountLow = "कम राशि"
+  override val selectedCountLabel = "चयनित"
+  override val bulkDeleteButton = "चयनित हटाएं"
+  override val loadMoreButton = "और दिखाएं"
+  override val overdueBadge = "अतिदेय"
+  override val overdueCountLabel = "अतिदेय"
+  override val partialBadge = "आंशिक"
+  override val unpaidBadge = "बकाया"
+  override val dueDateLabel = "नियत"
+  override val allAccountsOption = "सभी खाते"
+  override val receiptsLabel = "प्राप्तियां"
+  override val paymentsLabel = "भुगतान"
+  override val netChangeLabel = "शुद्ध बदलाव"
+  override val closingBalanceLabel = "अंतिम शेष"
+  override val runningBalanceLabel = "शेष"
+  override val exportLedgerCsv = "लेजर CSV"
+  override val exportTrialBalanceCsv = "ट्रायल बैलेंस CSV"
+  override val balancedBadge = "संतुलित"
+  override val unbalancedBadge = "असंतुलित"
+  override val debitLabel = "डेबिट"
+  override val creditLabel = "क्रेडिट"
+  override val assetsSection = "संपत्ति और नकद"
+  override val liabilitiesSection = "देनदारियां और पूंजी"
+  override val revenueSection = "राजस्व"
+  override val operatingExpensesSection = "संचालन खर्च"
+  override val trashEmptyTitle = "ट्रैश खाली है"
+  override val trashEmptyBody = "हटाए गए लेन-देन स्थायी रूप से हटने से पहले 30 दिनों तक यहां रहते हैं।"
+  override val restoreButton = "पुनर्स्थापित करें"
+  override val deleteForeverButton = "हमेशा के लिए हटाएं"
+  override val emptyTrashButton = "ट्रैश खाली करें"
+  override val daysRemainingSuffix = "दिन शेष"
+  override val restoredMessage = "सफलतापूर्वक पुनर्स्थापित"
+  override val movedToTrashMessage = "ट्रैश में भेजा गया"
+  override val displayPreferencesSection = "प्राथमिकताएं और गोपनीयता"
+  override val showNotesInListLabel = "सूची में नोट दिखाएं"
+  override val use24HourTimeLabel = "24-घंटे समय प्रारूप"
+  override val itemsPerPageLabel = "प्रति पृष्ठ आइटम"
+  override val allItemsLabel = "सभी"
+  override val blurBalancesLabel = "बैलेंस छिपाएं (Blur)"
+  override val hapticFeedbackLabel = "हैप्टिक फीडबैक"
+  override val dangerZoneSection = "खतरनाक क्षेत्र"
+  override val clearAllDataButton = "सभी डेटा मिटाएं"
+  override val confirmClearAllTitle = "सभी डेटा स्थायी रूप से मिटाएं?"
+  override val confirmClearAllMessage = "यह सभी खर्च, आय, खाते, कर्ज, बजट और ट्रैश स्थायी रूप से मिटा देगा। पहले बैकअप लेना बेहतर होगा।"
+  override val allDataClearedMessage = "सभी डेटा मिटा दिया गया"
 }
 
 fun stringsFor(language: AppLanguage): AppStrings = when (language) {

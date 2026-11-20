@@ -6,14 +6,25 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.core.content.res.ResourcesCompat
 import androidx.test.core.app.ApplicationProvider
+import com.example.data.backup.BackupSerializer
 import com.example.data.model.AccountTransfer
 import com.example.data.model.CategoryCatalog
+import com.example.data.model.CategoryFlowType
+import com.example.data.model.CustomAccount
+import com.example.data.model.CustomCategory
+import com.example.data.model.DateFormatUtils
 import com.example.data.model.Expense
 import com.example.data.model.Income
 import com.example.data.model.MarketList
 import com.example.data.model.MarketListItem
+import com.example.data.model.MonthlyBudget
 import com.example.data.model.Payable
+import com.example.data.model.PayablePayment
+import com.example.data.model.PaymentMethod
+import com.example.data.model.PeriodFilter
 import com.example.data.model.Receivable
+import com.example.data.model.ReceivablePayment
+import com.example.data.model.TrashItem
 import com.example.data.model.UiState
 import com.example.data.prefs.UserSettings
 import com.example.i18n.AppLanguage
@@ -21,21 +32,28 @@ import com.example.i18n.LocalStrings
 import com.example.i18n.stringsFor
 import com.example.ui.auth.AuthScreen
 import com.example.ui.screens.BudgetsScreen
+import com.example.ui.screens.CategoriesScreen
 import com.example.ui.screens.DashboardScreen
+import com.example.ui.screens.LedgerScreen
 import com.example.ui.screens.MarketScreen
 import com.example.ui.screens.ReportsScreen
 import com.example.ui.screens.SettingsScreen
+import com.example.ui.screens.TransactionsScreen
+import com.example.ui.screens.TrashScreen
+import com.example.ui.screens.TrialBalanceScreen
 import com.example.ui.screens.WalletsScreen
 import com.example.ui.theme.HisabTheme
 import com.example.viewmodel.AccountBalances
 import com.example.viewmodel.CategoryBreakdown
 import com.example.viewmodel.DashboardUiData
+import com.example.viewmodel.HisabAnalytics
 import com.example.viewmodel.MonthlySummary
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -77,6 +95,8 @@ class ExampleRobolectricTest {
       assertNotNull(s.appName)
       assertNotNull(s.splitByCategoryOption)
       assertNotNull(s.itemCategoryLabel)
+      assertNotNull(s.navTrialBalance)
+      assertNotNull(s.balancedBadge)
     }
   }
 
@@ -99,10 +119,233 @@ class ExampleRobolectricTest {
   }
 
   @Test
-  fun `auth and primary screens compose in bengali without crashing`() {
+  fun `trial balance, account ledger, and custom account routing stay mathematically balanced`() {
+    val strings = stringsFor(AppLanguage.BENGALI)
+    val monthKey = DateFormatUtils.currentMonthKey()
+    val (startMillis, endMillis) = DateFormatUtils.periodRangeMillis(PeriodFilter.THIS_MONTH, monthKey)
+    val txTime = ((startMillis + endMillis) / 2L).coerceAtMost(System.currentTimeMillis())
+
+    val bkash = CustomAccount(
+      id = "acct_bkash",
+      name = "Bkash",
+      accountType = PaymentMethod.MOBILE.wireValue,
+      iconKey = "mobile_pay",
+      colorHex = 0xFFDB2777,
+      openingBalance = 5000.0,
+    )
+    val ibbl = CustomAccount(
+      id = "acct_ibbl",
+      name = "IBBL",
+      accountType = PaymentMethod.BANK.wireValue,
+      iconKey = "bank",
+      colorHex = 0xFF2563EB,
+      openingBalance = 10000.0,
+    )
+    val data = DashboardUiData(
+      expenses = listOf(
+        Expense(
+          id = "e1",
+          title = "দুপুরের খাবার",
+          amount = 1500.0,
+          categoryId = "food",
+          paymentMethod = PaymentMethod.MOBILE.wireValue,
+          accountId = "acct_bkash",
+          dateMillis = txTime,
+          monthKey = monthKey,
+        )
+      ),
+      incomes = listOf(
+        Income(
+          id = "i1",
+          title = "বেতন",
+          amount = 20000.0,
+          categoryId = "inc_salary",
+          paymentMethod = PaymentMethod.BANK.wireValue,
+          accountId = "acct_ibbl",
+          dateMillis = txTime,
+          monthKey = monthKey,
+        )
+      ),
+      transfers = listOf(
+        AccountTransfer(
+          id = "t1",
+          fromMethod = PaymentMethod.BANK.wireValue,
+          toMethod = PaymentMethod.CASH.wireValue,
+          fromAccountId = "acct_ibbl",
+          toAccountId = null,
+          amount = 3000.0,
+          dateMillis = txTime,
+          monthKey = monthKey,
+        )
+      ),
+      payables = listOf(
+        Payable(
+          id = "p1",
+          personName = "করিম",
+          amount = 2000.0,
+          paidAmount = 500.0,
+          paymentMethod = PaymentMethod.CASH.wireValue,
+          dateMillis = txTime,
+          dueDateMillis = txTime + 86_400_000L,
+          monthKey = monthKey,
+        )
+      ),
+      payablePayments = listOf(
+        PayablePayment(
+          id = "pmt1",
+          payableId = "p1",
+          personName = "করিম",
+          amount = 500.0,
+          paymentMethod = PaymentMethod.MOBILE.wireValue,
+          accountId = "acct_bkash",
+          dateMillis = txTime,
+          monthKey = monthKey,
+        )
+      ),
+      receivables = listOf(
+        Receivable(
+          id = "r1",
+          personName = "রহিম",
+          amount = 1000.0,
+          collectedAmount = 400.0,
+          paymentMethod = PaymentMethod.CASH.wireValue,
+          dateMillis = txTime,
+          monthKey = monthKey,
+        )
+      ),
+      receivablePayments = listOf(
+        ReceivablePayment(
+          id = "rpmt1",
+          receivableId = "r1",
+          personName = "রহিম",
+          amount = 400.0,
+          paymentMethod = PaymentMethod.CASH.wireValue,
+          dateMillis = txTime,
+          monthKey = monthKey,
+        )
+      ),
+      customCategories = listOf(
+        CustomCategory(id = "cc1", name = "ফ্রিল্যান্স", categoryType = CategoryFlowType.INCOME.wireValue)
+      ),
+      budgets = listOf(MonthlyBudget(monthKey = monthKey, totalLimit = 10000.0)),
+      hasPendingWrites = false,
+      isFromCache = false,
+      customAccounts = listOf(bkash, ibbl),
+    )
+
+    val summaries = data.resolveAccountSummaries(strings, "BDT")
+    val bkashSummary = summaries.first { it.accountId == "acct_bkash" }
+    val ibblSummary = summaries.first { it.accountId == "acct_ibbl" }
+    val cashSummary = summaries.first { it.accountId == DashboardUiData.DEFAULT_ACCOUNT_PREFIX + "CASH" }
+
+    // Bkash: 5000 - 1500 (exp) - 500 (repay) = 3000
+    assertEquals(3000.0, bkashSummary.currentBalance, 0.01)
+    // IBBL: 10000 + 20000 (inc) - 3000 (transfer out) = 27000
+    assertEquals(27000.0, ibblSummary.currentBalance, 0.01)
+    // Cash: +3000 (tr in) +2000 (borrow) -1000 (lend) +400 (collect) = 4400
+    assertEquals(4400.0, cashSummary.currentBalance, 0.01)
+
+    val ledger = HisabAnalytics.computeAccountLedger(data, "acct_bkash", startMillis, endMillis, strings)
+    assertEquals(5000.0, ledger.openingBalance, 0.01)
+    assertEquals(3000.0, ledger.closingBalance, 0.01)
+
+    val period = HisabAnalytics.computePeriodAnalytics(data, PeriodFilter.THIS_MONTH, monthKey, AppLanguage.BENGALI)
+    assertEquals(20000.0, period.totalIncome, 0.01)
+    assertEquals(1500.0, period.totalSpent, 0.01)
+
+    val trialBalance = HisabAnalytics.computeTrialBalance(data, startMillis, endMillis, strings, "BDT")
+    assertTrue("Trial balance must always be balanced", trialBalance.isBalanced)
+    assertEquals(trialBalance.totalDebit, trialBalance.totalCredit, 0.01)
+  }
+
+  @Test
+  fun `backup serializer v5 round trips custom accounts and extended fields`() {
+    val json = BackupSerializer.toJsonBackup(
+      expenses = listOf(
+        Expense(
+          id = "e1",
+          title = "বাজার",
+          amount = 500.0,
+          categoryId = "groceries",
+          paymentMethod = PaymentMethod.MOBILE.wireValue,
+          accountId = "acct_1",
+          dateMillis = 1_760_000_000_000L,
+          monthKey = "2026-10",
+        )
+      ),
+      customCategories = listOf(
+        CustomCategory(
+          id = "c1",
+          name = "বোনাস",
+          iconKey = "salary",
+          colorHex = 0xFF0E7C5B,
+          categoryType = CategoryFlowType.INCOME.wireValue,
+        )
+      ),
+      budgets = emptyList(),
+      incomes = listOf(
+        Income(
+          id = "i1",
+          title = "বেতন",
+          amount = 25000.0,
+          categoryId = "inc_salary",
+          paymentMethod = PaymentMethod.BANK.wireValue,
+          accountId = "acct_2",
+          dateMillis = 1_760_000_000_000L,
+          monthKey = "2026-10",
+        )
+      ),
+      transfers = listOf(
+        AccountTransfer(
+          id = "t1",
+          fromMethod = PaymentMethod.BANK.wireValue,
+          toMethod = PaymentMethod.BANK.wireValue,
+          fromAccountId = "acct_2",
+          toAccountId = "acct_3",
+          amount = 1000.0,
+          dateMillis = 1_760_000_000_000L,
+          monthKey = "2026-10",
+        )
+      ),
+      payables = listOf(
+        Payable(
+          id = "p1",
+          personName = "করিম",
+          amount = 1200.0,
+          paymentMethod = PaymentMethod.CASH.wireValue,
+          dueDateMillis = 1_765_000_000_000L,
+          dateMillis = 1_760_000_000_000L,
+          monthKey = "2026-10",
+        )
+      ),
+      customAccounts = listOf(
+        CustomAccount(
+          id = "acct_1",
+          name = "Bkash",
+          accountType = PaymentMethod.MOBILE.wireValue,
+          openingBalance = 2500.0,
+        )
+      ),
+    )
+    val parsed = BackupSerializer.parseJsonBackup(json)
+    assertEquals(1, parsed.customAccounts.size)
+    assertEquals("Bkash", parsed.customAccounts.first().name)
+    assertEquals(2500.0, parsed.customAccounts.first().openingBalance, 0.01)
+    assertEquals("acct_1", parsed.expenses.first().accountId)
+    assertEquals("inc_salary", parsed.incomes.first().categoryId)
+    assertEquals("acct_2", parsed.transfers.first().fromAccountId)
+    assertEquals("acct_3", parsed.transfers.first().toAccountId)
+    assertEquals(1_765_000_000_000L, parsed.payables.first().dueDateMillis)
+    assertEquals(CategoryFlowType.INCOME.wireValue, parsed.customCategories.first().categoryType)
+  }
+
+  @Test
+  fun `auth and all primary and accounting screens compose in bengali without crashing`() {
     val settings = UserSettings(language = AppLanguage.BENGALI)
     val strings = stringsFor(settings.language)
     val builtInCats = CategoryCatalog.builtInCategories(strings)
+    val now = System.currentTimeMillis()
+    val monthKey = DateFormatUtils.currentMonthKey()
     val sampleData = DashboardUiData(
       expenses = listOf(
         Expense(
@@ -111,8 +354,8 @@ class ExampleRobolectricTest {
           title = "চাল ডাল",
           amount = 450.0,
           categoryId = "groceries",
-          dateMillis = System.currentTimeMillis(),
-          monthKey = "2026-11",
+          dateMillis = now,
+          monthKey = monthKey,
         )
       ),
       incomes = listOf(
@@ -121,20 +364,25 @@ class ExampleRobolectricTest {
           userId = "u1",
           title = "বেতন",
           amount = 20000.0,
-          dateMillis = System.currentTimeMillis(),
-          monthKey = "2026-11",
+          categoryId = "inc_salary",
+          dateMillis = now,
+          monthKey = monthKey,
         )
       ),
-      transfers = listOf(AccountTransfer(id = "t1", amount = 500.0, monthKey = "2026-11")),
-      payables = listOf(Payable(id = "p1", personName = "করিম", amount = 1000.0, monthKey = "2026-11")),
-      receivables = listOf(Receivable(id = "r1", personName = "রহিম", amount = 500.0, monthKey = "2026-11")),
-      customCategories = emptyList(),
+      transfers = listOf(AccountTransfer(id = "t1", amount = 500.0, dateMillis = now, monthKey = monthKey)),
+      payables = listOf(Payable(id = "p1", personName = "করিম", amount = 1000.0, dateMillis = now, monthKey = monthKey)),
+      receivables = listOf(Receivable(id = "r1", personName = "রহিম", amount = 500.0, dateMillis = now, monthKey = monthKey)),
+      customCategories = listOf(CustomCategory(id = "cc1", name = "বোনাস", categoryType = "INCOME")),
       budgets = emptyList(),
       hasPendingWrites = false,
       isFromCache = false,
+      customAccounts = listOf(CustomAccount(id = "a1", name = "IBBL", accountType = "BANK", openingBalance = 1000.0)),
+      trashItems = listOf(
+        TrashItem(id = "tr1", entityType = "EXPENSE", sourceId = "e0", title = "নাস্তা", amount = 80.0, deletedAtMillis = now)
+      ),
     )
     val summary = MonthlySummary(
-      monthKey = "2026-11",
+      monthKey = monthKey,
       totalSpent = 450.0,
       totalIncome = 20000.0,
       netBalance = 19550.0,
@@ -160,7 +408,7 @@ class ExampleRobolectricTest {
             uiState = UiState.Success(sampleData),
             settings = settings,
             isOnline = true,
-            selectedMonthKey = "2026-11",
+            selectedMonthKey = monthKey,
             selectedCategoryFilter = null,
             searchQuery = "",
             onShiftMonth = {},
@@ -171,6 +419,58 @@ class ExampleRobolectricTest {
             onNavigateToBudgets = {},
             marketLists = listOf(MarketList(id = "m1", title = "আজকের বাজার")),
             currentUserId = "u1",
+          )
+          TransactionsScreen(
+            uiState = UiState.Success(sampleData),
+            settings = settings,
+            selectedPeriod = PeriodFilter.THIS_MONTH,
+            selectedMonthKey = monthKey,
+            onSelectPeriod = {},
+            onShiftMonth = {},
+            onEditExpense = {},
+            onEditIncome = {},
+            onEditTransfer = {},
+            onEditPayable = {},
+            onEditReceivable = {},
+            onDeleteSingle = { _, _ -> },
+            onBulkSoftDelete = {},
+          )
+          CategoriesScreen(
+            uiState = UiState.Success(sampleData),
+            settings = settings,
+            selectedPeriod = PeriodFilter.THIS_MONTH,
+            selectedMonthKey = monthKey,
+            onSelectPeriod = {},
+            onShiftMonth = {},
+            onAddCustomCategory = { _, _, _, _ -> },
+            onUpdateCustomCategory = { _, _, _, _, _ -> },
+            onDeleteCustomCategory = {},
+            onBulkDeleteCustomCategories = {},
+          )
+          LedgerScreen(
+            uiState = UiState.Success(sampleData),
+            settings = settings,
+            selectedPeriod = PeriodFilter.THIS_MONTH,
+            selectedMonthKey = monthKey,
+            onSelectPeriod = {},
+            onShiftMonth = {},
+            onExportLedgerCsv = {},
+          )
+          TrialBalanceScreen(
+            uiState = UiState.Success(sampleData),
+            settings = settings,
+            selectedPeriod = PeriodFilter.THIS_MONTH,
+            selectedMonthKey = monthKey,
+            onSelectPeriod = {},
+            onShiftMonth = {},
+            onExportTrialBalanceCsv = {},
+          )
+          TrashScreen(
+            uiState = UiState.Success(sampleData),
+            settings = settings,
+            onRestoreItem = {},
+            onDeleteForever = {},
+            onEmptyTrash = {},
           )
           WalletsScreen(
             uiState = UiState.Success(sampleData),
@@ -211,14 +511,14 @@ class ExampleRobolectricTest {
           ReportsScreen(
             uiState = UiState.Success(sampleData),
             settings = settings,
-            selectedMonthKey = "2026-11",
+            selectedMonthKey = monthKey,
             onShiftMonth = {},
             computeSummary = { summary },
           )
           BudgetsScreen(
             uiState = UiState.Success(sampleData),
             settings = settings,
-            selectedMonthKey = "2026-11",
+            selectedMonthKey = monthKey,
             onSaveBudget = { _, _, _ -> },
             onToggleDailyReminder = { _, _, _ -> },
             onToggleBudgetAlerts = {},

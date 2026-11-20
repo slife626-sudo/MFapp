@@ -17,6 +17,29 @@ enum class PaymentMethod(val wireValue: String) {
   }
 }
 
+enum class CategoryFlowType(val wireValue: String) {
+  EXPENSE("EXPENSE"),
+  INCOME("INCOME");
+
+  companion object {
+    fun fromWire(value: String?): CategoryFlowType =
+      entries.firstOrNull { it.wireValue == value } ?: EXPENSE
+  }
+}
+
+enum class PeriodFilter(val id: String) {
+  THIS_MONTH("this_month"),
+  LAST_MONTH("last_month"),
+  THIS_QUARTER("this_quarter"),
+  THIS_YEAR("this_year"),
+  CUSTOM_MONTH("custom_month");
+
+  companion object {
+    fun fromId(id: String?): PeriodFilter =
+      entries.firstOrNull { it.id == id } ?: THIS_MONTH
+  }
+}
+
 enum class CurrencyOption(val code: String, val symbol: String, val label: String) {
   BDT("BDT", "৳", "BDT (৳)"),
   USD("USD", "$", "USD ($)"),
@@ -39,6 +62,7 @@ data class Expense(
   val amount: Double = 0.0,
   val categoryId: String = "food",
   val paymentMethod: String = PaymentMethod.CASH.wireValue,
+  val accountId: String? = null,
   val note: String = "",
   val dateMillis: Long = 0L,
   val monthKey: String = "",
@@ -53,7 +77,9 @@ data class Income(
   val userId: String = "",
   val title: String = "",
   val amount: Double = 0.0,
+  val categoryId: String? = null,
   val paymentMethod: String = PaymentMethod.CASH.wireValue,
+  val accountId: String? = null,
   val note: String = "",
   val dateMillis: Long = 0L,
   val monthKey: String = "",
@@ -68,6 +94,8 @@ data class AccountTransfer(
   val userId: String = "",
   val fromMethod: String = PaymentMethod.BANK.wireValue,
   val toMethod: String = PaymentMethod.CASH.wireValue,
+  val fromAccountId: String? = null,
+  val toAccountId: String? = null,
   val amount: Double = 0.0,
   val note: String = "",
   val dateMillis: Long = 0L,
@@ -85,8 +113,10 @@ data class Payable(
   val amount: Double = 0.0,
   val paidAmount: Double = 0.0,
   val paymentMethod: String = PaymentMethod.CASH.wireValue,
+  val accountId: String? = null,
   val note: String = "",
   val dateMillis: Long = 0L,
+  val dueDateMillis: Long? = null,
   val monthKey: String = "",
   val settled: Boolean = false,
   @com.google.firebase.firestore.ServerTimestamp val createdAt: Timestamp? = null,
@@ -102,6 +132,7 @@ data class PayablePayment(
   val personName: String = "",
   val amount: Double = 0.0,
   val paymentMethod: String = PaymentMethod.CASH.wireValue,
+  val accountId: String? = null,
   val note: String = "",
   val dateMillis: Long = 0L,
   val monthKey: String = "",
@@ -118,8 +149,10 @@ data class Receivable(
   val amount: Double = 0.0,
   val collectedAmount: Double = 0.0,
   val paymentMethod: String = PaymentMethod.CASH.wireValue,
+  val accountId: String? = null,
   val note: String = "",
   val dateMillis: Long = 0L,
+  val dueDateMillis: Long? = null,
   val monthKey: String = "",
   val settled: Boolean = false,
   @com.google.firebase.firestore.ServerTimestamp val createdAt: Timestamp? = null,
@@ -135,9 +168,41 @@ data class ReceivablePayment(
   val personName: String = "",
   val amount: Double = 0.0,
   val paymentMethod: String = PaymentMethod.CASH.wireValue,
+  val accountId: String? = null,
   val note: String = "",
   val dateMillis: Long = 0L,
   val monthKey: String = "",
+  @com.google.firebase.firestore.ServerTimestamp val createdAt: Timestamp? = null,
+  @com.google.firebase.firestore.ServerTimestamp val updatedAt: Timestamp? = null,
+)
+
+@Keep
+@IgnoreExtraProperties
+data class CustomAccount(
+  @DocumentId val id: String = "",
+  val userId: String = "",
+  val name: String = "",
+  val accountType: String = PaymentMethod.BANK.wireValue,
+  val iconKey: String = "bank",
+  val colorHex: Long = 0xFF2563EB,
+  val openingBalance: Double = 0.0,
+  val currencyCode: String = CurrencyOption.BDT.code,
+  val custom: Boolean = true,
+  @com.google.firebase.firestore.ServerTimestamp val createdAt: Timestamp? = null,
+  @com.google.firebase.firestore.ServerTimestamp val updatedAt: Timestamp? = null,
+)
+
+@Keep
+@IgnoreExtraProperties
+data class TrashItem(
+  @DocumentId val id: String = "",
+  val userId: String = "",
+  val entityType: String = "EXPENSE",
+  val sourceId: String = "",
+  val title: String = "",
+  val amount: Double = 0.0,
+  val deletedAtMillis: Long = 0L,
+  val payload: Map<String, Any?> = emptyMap(),
   @com.google.firebase.firestore.ServerTimestamp val createdAt: Timestamp? = null,
   @com.google.firebase.firestore.ServerTimestamp val updatedAt: Timestamp? = null,
 )
@@ -185,6 +250,7 @@ data class CustomCategory(
   val name: String = "",
   val iconKey: String = "tag",
   val colorHex: Long = 0xFF0E7C5B,
+  val categoryType: String = CategoryFlowType.EXPENSE.wireValue,
   @com.google.firebase.firestore.ServerTimestamp val createdAt: Timestamp? = null,
   @com.google.firebase.firestore.ServerTimestamp val updatedAt: Timestamp? = null,
 )
@@ -208,6 +274,20 @@ data class CategoryItem(
   val iconKey: String,
   val colorHex: Long,
   val isCustom: Boolean = false,
+  val flowType: CategoryFlowType = CategoryFlowType.EXPENSE,
+)
+
+data class AccountSummary(
+  val accountId: String,
+  val name: String,
+  val method: PaymentMethod,
+  val iconKey: String,
+  val colorHex: Long,
+  val openingBalance: Double,
+  val currentBalance: Double,
+  val currencyCode: String,
+  val isCustom: Boolean,
+  val customAccount: CustomAccount? = null,
 )
 
 sealed interface UiState<out T> {

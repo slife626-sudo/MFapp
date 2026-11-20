@@ -1,7 +1,6 @@
 package com.example.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -25,10 +24,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CalendarMonth
-import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Event
 import androidx.compose.material.icons.rounded.Handshake
 import androidx.compose.material.icons.rounded.NorthEast
 import androidx.compose.material.icons.rounded.ReceiptLong
+import androidx.compose.material.icons.rounded.Schedule
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material3.AlertDialog
@@ -46,10 +48,13 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,8 +68,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.example.data.model.AccountSummary
 import com.example.data.model.AccountTransfer
 import com.example.data.model.CategoryCatalog
+import com.example.data.model.CategoryFlowType
 import com.example.data.model.CategoryItem
 import com.example.data.model.CurrencyFormat
 import com.example.data.model.DateFormatUtils
@@ -77,6 +84,8 @@ import com.example.i18n.AppStrings
 import com.example.i18n.LocalStrings
 import com.example.ui.theme.HisabMonoFontFamily
 import com.example.viewmodel.AccountBalances
+import com.example.viewmodel.DashboardUiData
+import java.util.Calendar
 
 enum class EntrySheetMode {
   EXPENSE,
@@ -101,8 +110,8 @@ fun AddEditExpenseSheet(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
-  ) -> Unit,
-  onCreateCustomCategory: (name: String, iconKey: String, colorHex: Long) -> Unit,
+  ) -> Unit = { _, _, _, _, _, _ -> },
+  onCreateCustomCategory: (name: String, iconKey: String, colorHex: Long) -> Unit = { _, _, _ -> },
   initialIncome: Income? = null,
   initialTransfer: AccountTransfer? = null,
   initialPayable: Payable? = null,
@@ -137,15 +146,30 @@ fun AddEditExpenseSheet(
     note: String,
     dateMillis: Long,
   ) -> Unit = { _, _, _, _, _ -> },
+  accountSummaries: List<AccountSummary> = emptyList(),
+  incomeCategories: List<CategoryItem> = emptyList(),
+  use24HourTime: Boolean = false,
+  blurBalances: Boolean = false,
+  hapticEnabled: Boolean = true,
+  onSaveExpenseEx: ((title: String, amount: Double, categoryId: String, paymentMethod: PaymentMethod, note: String, dateMillis: Long, accountId: String?) -> Unit)? = null,
+  onSaveIncomeEx: ((title: String, amount: Double, paymentMethod: PaymentMethod, note: String, dateMillis: Long, categoryId: String?, accountId: String?) -> Unit)? = null,
+  onSaveTransferEx: ((fromMethod: PaymentMethod, toMethod: PaymentMethod, amount: Double, note: String, dateMillis: Long, fromAccountId: String?, toAccountId: String?) -> Unit)? = null,
+  onSavePayableEx: ((personName: String, amount: Double, paymentMethod: PaymentMethod, note: String, dateMillis: Long, dueDateMillis: Long?, accountId: String?) -> Unit)? = null,
+  onSaveReceivableEx: ((personName: String, amount: Double, paymentMethod: PaymentMethod, note: String, dateMillis: Long, dueDateMillis: Long?, accountId: String?) -> Unit)? = null,
+  onCreateCustomCategoryEx: ((name: String, iconKey: String, colorHex: Long, flowType: CategoryFlowType) -> Unit)? = null,
 ) {
   val strings = LocalStrings.current
   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+  val haptic = rememberHapticTrigger(hapticEnabled)
 
   val isCreatingNew = initialExpense == null &&
     initialIncome == null &&
     initialTransfer == null &&
     initialPayable == null &&
     initialReceivable == null
+
+  var multipleMode by remember { mutableStateOf(false) }
+  var batchSavedCount by remember { mutableIntStateOf(0) }
 
   var mode by remember(initialExpense, initialIncome, initialTransfer, initialPayable, initialReceivable, initialMode) {
     mutableStateOf(
@@ -186,6 +210,13 @@ fun AddEditExpenseSheet(
   var selectedCategoryId by remember(initialExpense) {
     mutableStateOf(initialExpense?.categoryId ?: categories.firstOrNull()?.id ?: "food")
   }
+  val resolvedIncomeCats = remember(incomeCategories, strings) {
+    incomeCategories.ifEmpty { CategoryCatalog.builtInIncomeCategories(strings) }
+  }
+  var selectedIncomeCategoryId by remember(initialIncome) {
+    mutableStateOf(initialIncome?.categoryId ?: resolvedIncomeCats.firstOrNull()?.id ?: "inc_salary")
+  }
+
   var selectedMethod by remember(initialExpense, initialIncome, initialPayable, initialReceivable) {
     mutableStateOf(
       PaymentMethod.fromWire(
@@ -196,11 +227,26 @@ fun AddEditExpenseSheet(
       )
     )
   }
+  var selectedAccountKey by remember(initialExpense, initialIncome, initialPayable, initialReceivable, accountSummaries) {
+    val acctId = initialExpense?.accountId
+      ?: initialIncome?.accountId
+      ?: initialPayable?.accountId
+      ?: initialReceivable?.accountId
+    val key = acctId?.takeIf { id -> accountSummaries.any { it.accountId == id } }
+      ?: (DashboardUiData.DEFAULT_ACCOUNT_PREFIX + selectedMethod.wireValue)
+    mutableStateOf(key)
+  }
+
   var fromMethod by remember(initialTransfer) {
     mutableStateOf(
       if (initialTransfer != null) PaymentMethod.fromWire(initialTransfer.fromMethod)
       else PaymentMethod.BANK
     )
+  }
+  var fromAccountKey by remember(initialTransfer, accountSummaries) {
+    val key = initialTransfer?.fromAccountId?.takeIf { id -> accountSummaries.any { it.accountId == id } }
+      ?: (DashboardUiData.DEFAULT_ACCOUNT_PREFIX + fromMethod.wireValue)
+    mutableStateOf(key)
   }
   var toMethod by remember(initialTransfer) {
     mutableStateOf(
@@ -208,6 +254,12 @@ fun AddEditExpenseSheet(
       else PaymentMethod.CASH
     )
   }
+  var toAccountKey by remember(initialTransfer, accountSummaries) {
+    val key = initialTransfer?.toAccountId?.takeIf { id -> accountSummaries.any { it.accountId == id } }
+      ?: (DashboardUiData.DEFAULT_ACCOUNT_PREFIX + toMethod.wireValue)
+    mutableStateOf(key)
+  }
+
   var note by remember(initialExpense, initialIncome, initialTransfer, initialPayable, initialReceivable) {
     mutableStateOf(
       initialExpense?.note
@@ -228,8 +280,13 @@ fun AddEditExpenseSheet(
         ?: System.currentTimeMillis()
     )
   }
+  var dueDateMillis by remember(initialPayable, initialReceivable) {
+    mutableStateOf(initialPayable?.dueDateMillis ?: initialReceivable?.dueDateMillis)
+  }
   var validationError by remember { mutableStateOf<String?>(null) }
   var showDatePicker by remember { mutableStateOf(false) }
+  var showTimePicker by remember { mutableStateOf(false) }
+  var showDueDatePicker by remember { mutableStateOf(false) }
   var showCustomCategoryDialog by remember { mutableStateOf(false) }
 
   ModalBottomSheet(
@@ -244,21 +301,60 @@ fun AddEditExpenseSheet(
         .padding(bottom = 28.dp),
       verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-      Text(
-        text = when {
-          initialTransfer != null -> strings.editTransfer
-          initialReceivable != null -> strings.editLend
-          initialPayable != null -> strings.editBorrow
-          initialIncome != null -> strings.editBalance
-          initialExpense != null -> strings.editExpense
-          mode == EntrySheetMode.TRANSFER -> strings.addTransfer
-          mode == EntrySheetMode.LEND -> strings.addLend
-          mode == EntrySheetMode.BORROW -> strings.addBorrow
-          mode == EntrySheetMode.INCOME -> strings.addBalance
-          else -> strings.addExpense
-        },
-        style = MaterialTheme.typography.titleLarge,
-      )
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Text(
+          text = when {
+            initialTransfer != null -> strings.editTransfer
+            initialReceivable != null -> strings.editLend
+            initialPayable != null -> strings.editBorrow
+            initialIncome != null -> strings.editBalance
+            initialExpense != null -> strings.editExpense
+            mode == EntrySheetMode.TRANSFER -> strings.addTransfer
+            mode == EntrySheetMode.LEND -> strings.addLend
+            mode == EntrySheetMode.BORROW -> strings.addBorrow
+            mode == EntrySheetMode.INCOME -> strings.addBalance
+            else -> strings.addExpense
+          },
+          style = MaterialTheme.typography.titleLarge,
+          modifier = Modifier.weight(1f),
+        )
+
+        if (isCreatingNew) {
+          Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FilterChip(
+              selected = !multipleMode,
+              onClick = { multipleMode = false },
+              label = { Text(strings.singleModeTab) },
+              modifier = Modifier.testTag("entry_mode_single"),
+            )
+            FilterChip(
+              selected = multipleMode,
+              onClick = { multipleMode = true },
+              label = { Text(strings.multipleModeTab) },
+              modifier = Modifier.testTag("entry_mode_multiple"),
+            )
+          }
+        }
+      }
+
+      if (multipleMode && batchSavedCount > 0) {
+        Surface(
+          color = MaterialTheme.colorScheme.primaryContainer,
+          shape = RoundedCornerShape(12.dp),
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          Text(
+            text = "${strings.savedBadgeCount}: $batchSavedCount • ${strings.addAnotherHint}",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+          )
+        }
+      }
 
       if (isCreatingNew) {
         Row(
@@ -349,6 +445,9 @@ fun AddEditExpenseSheet(
               }
             )
           },
+          placeholder = if (mode == EntrySheetMode.EXPENSE || mode == EntrySheetMode.INCOME) {
+            { Text(strings.titleOptionalHint) }
+          } else null,
           singleLine = true,
           modifier = Modifier
             .fillMaxWidth()
@@ -368,6 +467,36 @@ fun AddEditExpenseSheet(
             color = MaterialTheme.colorScheme.onSecondaryContainer,
             modifier = Modifier.padding(12.dp),
           )
+        }
+
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          OutlinedButton(
+            onClick = { showDueDatePicker = true },
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+              .weight(1f)
+              .testTag("pick_due_date_button"),
+          ) {
+            Icon(Icons.Rounded.Event, contentDescription = strings.dueDateOptionalLabel)
+            Spacer(Modifier.width(8.dp))
+            Text(
+              text = dueDateMillis?.let {
+                "${strings.dueDateLabel}: ${DateFormatUtils.formatDateCompact(it, langCode)}"
+              } ?: strings.dueDateOptionalLabel,
+            )
+          }
+          if (dueDateMillis != null) {
+            IconButton(
+              onClick = { dueDateMillis = null },
+              modifier = Modifier.testTag("clear_due_date_button"),
+            ) {
+              Icon(Icons.Rounded.Close, contentDescription = strings.clearDueDate)
+            }
+          }
         }
       }
 
@@ -408,6 +537,43 @@ fun AddEditExpenseSheet(
             Text(strings.addCustomCategory)
           }
         }
+      } else if (mode == EntrySheetMode.INCOME) {
+        Text(
+          text = strings.categoryLabel,
+          style = MaterialTheme.typography.labelLarge,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        FlowRow(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          resolvedIncomeCats.forEach { cat ->
+            val selected = selectedIncomeCategoryId == cat.id
+            FilterChip(
+              selected = selected,
+              onClick = { selectedIncomeCategoryId = cat.id },
+              leadingIcon = {
+                Icon(
+                  imageVector = CategoryCatalog.iconFor(cat.iconKey),
+                  contentDescription = cat.name,
+                  tint = Color(cat.colorHex),
+                  modifier = Modifier.size(18.dp),
+                )
+              },
+              label = { Text(cat.name) },
+              modifier = Modifier.testTag("income_category_chip_${cat.id}"),
+            )
+          }
+          OutlinedButton(
+            onClick = { showCustomCategoryDialog = true },
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.testTag("add_custom_income_category_button"),
+          ) {
+            Icon(Icons.Rounded.Add, contentDescription = strings.addCustomCategory, Modifier.size(16.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(strings.addCustomCategory)
+          }
+        }
       }
 
       if (mode == EntrySheetMode.TRANSFER) {
@@ -416,13 +582,27 @@ fun AddEditExpenseSheet(
           style = MaterialTheme.typography.labelLarge,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        AccountMethodChips(
-          selected = fromMethod,
-          onSelect = { fromMethod = it; validationError = null },
-          accountBalances = accountBalances,
-          currencySymbol = currencySymbol,
-          strings = strings,
-        )
+        if (accountSummaries.isNotEmpty()) {
+          AccountSelectorChips(
+            summaries = accountSummaries,
+            selectedKey = fromAccountKey,
+            currencySymbol = currencySymbol,
+            blurBalances = blurBalances,
+            onSelect = { acct ->
+              fromAccountKey = acct.accountId
+              fromMethod = acct.method
+              validationError = null
+            },
+          )
+        } else {
+          AccountMethodChips(
+            selected = fromMethod,
+            onSelect = { fromMethod = it; validationError = null },
+            accountBalances = accountBalances,
+            currencySymbol = currencySymbol,
+            strings = strings,
+          )
+        }
 
         Row(
           modifier = Modifier.fillMaxWidth(),
@@ -430,9 +610,12 @@ fun AddEditExpenseSheet(
         ) {
           IconButton(
             onClick = {
-              val tmp = fromMethod
+              val tmpM = fromMethod
               fromMethod = toMethod
-              toMethod = tmp
+              toMethod = tmpM
+              val tmpKey = fromAccountKey
+              fromAccountKey = toAccountKey
+              toAccountKey = tmpKey
               validationError = null
             },
             modifier = Modifier.testTag("swap_accounts_btn"),
@@ -450,41 +633,84 @@ fun AddEditExpenseSheet(
           style = MaterialTheme.typography.labelLarge,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        AccountMethodChips(
-          selected = toMethod,
-          onSelect = { toMethod = it; validationError = null },
-          accountBalances = accountBalances,
-          currencySymbol = currencySymbol,
-          strings = strings,
-        )
+        if (accountSummaries.isNotEmpty()) {
+          AccountSelectorChips(
+            summaries = accountSummaries,
+            selectedKey = toAccountKey,
+            currencySymbol = currencySymbol,
+            blurBalances = blurBalances,
+            onSelect = { acct ->
+              toAccountKey = acct.accountId
+              toMethod = acct.method
+              validationError = null
+            },
+          )
+        } else {
+          AccountMethodChips(
+            selected = toMethod,
+            onSelect = { toMethod = it; validationError = null },
+            accountBalances = accountBalances,
+            currencySymbol = currencySymbol,
+            strings = strings,
+          )
+        }
       } else {
         Text(
           text = when (mode) {
-            EntrySheetMode.EXPENSE -> strings.paymentMethodLabel
+            EntrySheetMode.EXPENSE -> strings.selectAccountLabel
             EntrySheetMode.LEND -> strings.lendFromAccountLabel
             else -> strings.receiveMethodLabel
           },
           style = MaterialTheme.typography.labelLarge,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        AccountMethodChips(
-          selected = selectedMethod,
-          onSelect = { selectedMethod = it },
-          accountBalances = accountBalances,
-          currencySymbol = currencySymbol,
-          strings = strings,
-        )
+        if (accountSummaries.isNotEmpty()) {
+          AccountSelectorChips(
+            summaries = accountSummaries,
+            selectedKey = selectedAccountKey,
+            currencySymbol = currencySymbol,
+            blurBalances = blurBalances,
+            onSelect = { acct ->
+              selectedAccountKey = acct.accountId
+              selectedMethod = acct.method
+            },
+          )
+        } else {
+          AccountMethodChips(
+            selected = selectedMethod,
+            onSelect = { selectedMethod = it },
+            accountBalances = accountBalances,
+            currencySymbol = currencySymbol,
+            strings = strings,
+          )
+        }
       }
 
-      // Date button
-      OutlinedButton(
-        onClick = { showDatePicker = true },
-        shape = RoundedCornerShape(12.dp),
+      // Date + Time row
+      Row(
         modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
       ) {
-        Icon(Icons.Rounded.CalendarMonth, contentDescription = strings.dateLabel)
-        Spacer(Modifier.width(8.dp))
-        Text("${strings.dateLabel}: ${DateFormatUtils.formatDateCompact(dateMillis, langCode)}")
+        OutlinedButton(
+          onClick = { showDatePicker = true },
+          shape = RoundedCornerShape(12.dp),
+          modifier = Modifier
+            .weight(1f)
+            .testTag("entry_date_button"),
+        ) {
+          Icon(Icons.Rounded.CalendarMonth, contentDescription = strings.dateLabel)
+          Spacer(Modifier.width(6.dp))
+          Text(DateFormatUtils.formatDateCompact(dateMillis, langCode))
+        }
+        OutlinedButton(
+          onClick = { showTimePicker = true },
+          shape = RoundedCornerShape(12.dp),
+          modifier = Modifier.testTag("entry_time_button"),
+        ) {
+          Icon(Icons.Rounded.Schedule, contentDescription = strings.timeLabel)
+          Spacer(Modifier.width(6.dp))
+          Text(DateFormatUtils.formatTimeOnly(dateMillis, langCode, use24HourTime))
+        }
       }
 
       OutlinedTextField(
@@ -522,49 +748,87 @@ fun AddEditExpenseSheet(
               validationError = strings.invalidInputError
               return@Button
             }
+            val selectedCustomAccountId = accountSummaries
+              .firstOrNull { it.accountId == selectedAccountKey && it.isCustom }?.accountId
+
             when (mode) {
               EntrySheetMode.TRANSFER -> {
-                if (fromMethod == toMethod) {
+                val fromCustom = accountSummaries.firstOrNull { it.accountId == fromAccountKey && it.isCustom }?.accountId
+                val toCustom = accountSummaries.firstOrNull { it.accountId == toAccountKey && it.isCustom }?.accountId
+                val distinctCustom = fromCustom != null && toCustom != null && fromCustom != toCustom
+                if ((accountSummaries.isNotEmpty() && fromAccountKey == toAccountKey) ||
+                  (accountSummaries.isEmpty() && fromMethod == toMethod) ||
+                  (fromMethod == toMethod && !distinctCustom && fromAccountKey == toAccountKey)
+                ) {
                   validationError = strings.sameAccountTransferError
                   return@Button
                 }
-                onSaveTransfer(fromMethod, toMethod, amount, note.trim(), dateMillis)
+                if (fromMethod == toMethod && !(fromCustom != null && toCustom != null && fromCustom != toCustom)) {
+                  // Also check one default + one custom of same method: Firestore rule requires distinct fromAccountId & toAccountId if methods match!
+                  validationError = strings.sameAccountTransferError
+                  return@Button
+                }
+                haptic()
+                if (onSaveTransferEx != null) {
+                  onSaveTransferEx(fromMethod, toMethod, amount, note.trim(), dateMillis, fromCustom, toCustom)
+                } else {
+                  onSaveTransfer(fromMethod, toMethod, amount, note.trim(), dateMillis)
+                }
               }
               EntrySheetMode.BORROW -> {
                 if (title.trim().isEmpty()) {
                   validationError = strings.invalidInputError
                   return@Button
                 }
-                onSavePayable(title.trim(), amount, selectedMethod, note.trim(), dateMillis)
+                haptic()
+                if (onSavePayableEx != null) {
+                  onSavePayableEx(title.trim(), amount, selectedMethod, note.trim(), dateMillis, dueDateMillis, selectedCustomAccountId)
+                } else {
+                  onSavePayable(title.trim(), amount, selectedMethod, note.trim(), dateMillis)
+                }
               }
               EntrySheetMode.LEND -> {
                 if (title.trim().isEmpty()) {
                   validationError = strings.invalidInputError
                   return@Button
                 }
-                onSaveReceivable(title.trim(), amount, selectedMethod, note.trim(), dateMillis)
+                haptic()
+                if (onSaveReceivableEx != null) {
+                  onSaveReceivableEx(title.trim(), amount, selectedMethod, note.trim(), dateMillis, dueDateMillis, selectedCustomAccountId)
+                } else {
+                  onSaveReceivable(title.trim(), amount, selectedMethod, note.trim(), dateMillis)
+                }
               }
               EntrySheetMode.INCOME -> {
-                if (title.trim().isEmpty()) {
-                  validationError = strings.invalidInputError
-                  return@Button
+                val resolvedCatName = resolvedIncomeCats.firstOrNull { it.id == selectedIncomeCategoryId }?.name ?: strings.balanceTypeTab
+                val finalTitle = title.trim().ifEmpty { resolvedCatName }
+                haptic()
+                if (onSaveIncomeEx != null) {
+                  onSaveIncomeEx(finalTitle, amount, selectedMethod, note.trim(), dateMillis, selectedIncomeCategoryId, selectedCustomAccountId)
+                } else {
+                  onSaveIncome(finalTitle, amount, selectedMethod, note.trim(), dateMillis)
                 }
-                onSaveIncome(title.trim(), amount, selectedMethod, note.trim(), dateMillis)
               }
               EntrySheetMode.EXPENSE -> {
-                if (title.trim().isEmpty()) {
-                  validationError = strings.invalidInputError
-                  return@Button
+                val resolvedCatName = categories.firstOrNull { it.id == selectedCategoryId }?.name ?: strings.catOther
+                val finalTitle = title.trim().ifEmpty { resolvedCatName }
+                haptic()
+                if (onSaveExpenseEx != null) {
+                  onSaveExpenseEx(finalTitle, amount, selectedCategoryId, selectedMethod, note.trim(), dateMillis, selectedCustomAccountId)
+                } else {
+                  onSaveExpense(finalTitle, amount, selectedCategoryId, selectedMethod, note.trim(), dateMillis)
                 }
-                onSaveExpense(
-                  title.trim(),
-                  amount,
-                  selectedCategoryId,
-                  selectedMethod,
-                  note.trim(),
-                  dateMillis,
-                )
               }
+            }
+
+            if (isCreatingNew && multipleMode) {
+              batchSavedCount++
+              amountText = ""
+              title = ""
+              note = ""
+              dueDateMillis = null
+            } else {
+              onDismiss()
             }
           },
           modifier = Modifier
@@ -585,7 +849,16 @@ fun AddEditExpenseSheet(
       confirmButton = {
         TextButton(
           onClick = {
-            pickerState.selectedDateMillis?.let { dateMillis = it }
+            pickerState.selectedDateMillis?.let { pickedDate ->
+              val oldCal = Calendar.getInstance().apply { timeInMillis = dateMillis }
+              val newCal = Calendar.getInstance().apply {
+                timeInMillis = pickedDate
+                set(Calendar.HOUR_OF_DAY, oldCal.get(Calendar.HOUR_OF_DAY))
+                set(Calendar.MINUTE, oldCal.get(Calendar.MINUTE))
+                set(Calendar.SECOND, 0)
+              }
+              dateMillis = newCal.timeInMillis
+            }
             showDatePicker = false
           }
         ) {
@@ -602,27 +875,104 @@ fun AddEditExpenseSheet(
     }
   }
 
+  if (showTimePicker) {
+    val curCal = remember(dateMillis) { Calendar.getInstance().apply { timeInMillis = dateMillis } }
+    val timeState = rememberTimePickerState(
+      initialHour = curCal.get(Calendar.HOUR_OF_DAY),
+      initialMinute = curCal.get(Calendar.MINUTE),
+      is24Hour = use24HourTime,
+    )
+    AlertDialog(
+      onDismissRequest = { showTimePicker = false },
+      title = { Text(strings.timeLabel) },
+      text = { TimePicker(state = timeState) },
+      confirmButton = {
+        TextButton(
+          onClick = {
+            val updated = Calendar.getInstance().apply {
+              timeInMillis = dateMillis
+              set(Calendar.HOUR_OF_DAY, timeState.hour)
+              set(Calendar.MINUTE, timeState.minute)
+              set(Calendar.SECOND, 0)
+            }
+            dateMillis = updated.timeInMillis
+            showTimePicker = false
+          }
+        ) {
+          Text(strings.save)
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { showTimePicker = false }) {
+          Text(strings.cancel)
+        }
+      },
+    )
+  }
+
+  if (showDueDatePicker) {
+    val pickerState = rememberDatePickerState(
+      initialSelectedDateMillis = dueDateMillis ?: (System.currentTimeMillis() + 7L * 86_400_000L),
+    )
+    DatePickerDialog(
+      onDismissRequest = { showDueDatePicker = false },
+      confirmButton = {
+        TextButton(
+          onClick = {
+            pickerState.selectedDateMillis?.let { dueDateMillis = it }
+            showDueDatePicker = false
+          }
+        ) {
+          Text(strings.save)
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { showDueDatePicker = false }) {
+          Text(strings.cancel)
+        }
+      },
+    ) {
+      DatePicker(state = pickerState)
+    }
+  }
+
   if (showCustomCategoryDialog) {
     AddCustomCategoryDialog(
+      initialFlowType = if (mode == EntrySheetMode.INCOME) CategoryFlowType.INCOME else CategoryFlowType.EXPENSE,
+      langCode = langCode,
       onDismiss = { showCustomCategoryDialog = false },
       onConfirm = { name, iconKey, colorHex ->
         onCreateCustomCategory(name, iconKey, colorHex)
         showCustomCategoryDialog = false
       },
+      onConfirmWithType = onCreateCustomCategoryEx?.let { cb ->
+        { name, iconKey, colorHex, flowType ->
+          cb(name, iconKey, colorHex, flowType)
+          showCustomCategoryDialog = false
+        }
+      },
     )
   }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddCustomCategoryDialog(
   onDismiss: () -> Unit,
-  onConfirm: (name: String, iconKey: String, colorHex: Long) -> Unit,
+  onConfirm: (name: String, iconKey: String, colorHex: Long) -> Unit = { _, _, _ -> },
+  initialName: String = "",
+  initialIconKey: String = "pets",
+  initialColorHex: Long = CategoryCatalog.colorOptions.first(),
+  initialFlowType: CategoryFlowType = CategoryFlowType.EXPENSE,
+  langCode: String = "bn",
+  isEditing: Boolean = false,
+  onConfirmWithType: ((name: String, iconKey: String, colorHex: Long, flowType: CategoryFlowType) -> Unit)? = null,
 ) {
   val strings = LocalStrings.current
-  var name by remember { mutableStateOf("") }
-  var selectedIcon by remember { mutableStateOf("pets") }
-  var selectedColor by remember { mutableLongStateOf(CategoryCatalog.colorOptions.first()) }
+  var name by remember(initialName) { mutableStateOf(initialName) }
+  var selectedIcon by remember(initialIconKey) { mutableStateOf(initialIconKey) }
+  var selectedColor by remember(initialColorHex) { mutableLongStateOf(initialColorHex) }
+  var selectedType by remember(initialFlowType) { mutableStateOf(initialFlowType) }
+  var showIconPicker by remember { mutableStateOf(false) }
 
   AlertDialog(
     onDismissRequest = onDismiss,
@@ -632,71 +982,74 @@ fun AddCustomCategoryDialog(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         modifier = Modifier.verticalScroll(rememberScrollState()),
       ) {
+        if (onConfirmWithType != null) {
+          Text(strings.categoryTypeLabel, style = MaterialTheme.typography.labelMedium)
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(
+              selected = selectedType == CategoryFlowType.EXPENSE,
+              onClick = { selectedType = CategoryFlowType.EXPENSE },
+              label = { Text(strings.expenseCategoryType) },
+            )
+            FilterChip(
+              selected = selectedType == CategoryFlowType.INCOME,
+              onClick = { selectedType = CategoryFlowType.INCOME },
+              label = { Text(strings.incomeCategoryType) },
+            )
+          }
+        }
+
         OutlinedTextField(
           value = name,
           onValueChange = { if (it.length <= 40) name = it },
           label = { Text(strings.customCategoryName) },
           singleLine = true,
-          modifier = Modifier.fillMaxWidth(),
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("custom_category_name_input"),
         )
-        Text(strings.chooseColor, style = MaterialTheme.typography.labelMedium)
-        FlowRow(
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
-          verticalArrangement = Arrangement.spacedBy(8.dp),
+
+        Surface(
+          color = MaterialTheme.colorScheme.surfaceContainerLow,
+          shape = RoundedCornerShape(14.dp),
+          modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable { showIconPicker = true }
+            .testTag("category_icon_picker_button"),
         ) {
-          CategoryCatalog.colorOptions.forEach { hex ->
-            val isSelected = selectedColor == hex
+          Row(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+          ) {
             Box(
               modifier = Modifier
-                .size(34.dp)
+                .size(38.dp)
                 .clip(CircleShape)
-                .background(Color(hex))
-                .border(
-                  width = if (isSelected) 3.dp else 0.dp,
-                  color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.Transparent,
-                  shape = CircleShape,
-                )
-                .clickable { selectedColor = hex },
+                .background(Color(selectedColor).copy(alpha = 0.16f)),
               contentAlignment = Alignment.Center,
             ) {
-              if (isSelected) {
-                Icon(
-                  Icons.Rounded.Check,
-                  contentDescription = null,
-                  tint = Color.White,
-                  modifier = Modifier.size(18.dp),
-                )
-              }
+              Icon(
+                imageVector = CategoryCatalog.iconFor(selectedIcon),
+                contentDescription = strings.chooseIcon,
+                tint = Color(selectedColor),
+              )
             }
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+              Text(strings.chooseIcon, style = MaterialTheme.typography.labelLarge)
+              Text(selectedIcon, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(Icons.Rounded.Edit, contentDescription = strings.chooseIcon)
           }
         }
-        Text(strings.chooseIcon, style = MaterialTheme.typography.labelMedium)
-        FlowRow(
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
-          verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          CategoryCatalog.iconOptions.forEach { (key, vector) ->
-            val isSelected = selectedIcon == key
-            Surface(
-              shape = RoundedCornerShape(10.dp),
-              color = if (isSelected) MaterialTheme.colorScheme.primaryContainer
-              else MaterialTheme.colorScheme.surfaceContainerLow,
-              modifier = Modifier
-                .size(42.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .clickable { selectedIcon = key },
-            ) {
-              Box(contentAlignment = Alignment.Center) {
-                Icon(
-                  imageVector = vector,
-                  contentDescription = key,
-                  tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-                  else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-              }
-            }
-          }
-        }
+
+        Text(strings.chooseColor, style = MaterialTheme.typography.labelMedium)
+        ColorSwatchPicker(
+          selectedColorHex = selectedColor,
+          onSelectColor = { selectedColor = it },
+        )
       }
     },
     confirmButton = {
@@ -704,10 +1057,15 @@ fun AddCustomCategoryDialog(
         onClick = {
           val clean = name.trim()
           if (clean.isNotEmpty()) {
-            onConfirm(clean, selectedIcon, selectedColor)
+            if (onConfirmWithType != null) {
+              onConfirmWithType(clean, selectedIcon, selectedColor, selectedType)
+            } else {
+              onConfirm(clean, selectedIcon, selectedColor)
+            }
           }
         },
         enabled = name.trim().isNotEmpty(),
+        modifier = Modifier.testTag("save_custom_category_button"),
       ) {
         Text(strings.save)
       }
@@ -716,6 +1074,15 @@ fun AddCustomCategoryDialog(
       TextButton(onClick = onDismiss) { Text(strings.cancel) }
     },
   )
+
+  if (showIconPicker) {
+    IconPickerDialog(
+      selectedIconKey = selectedIcon,
+      langCode = langCode,
+      onDismiss = { showIconPicker = false },
+      onSelectIcon = { selectedIcon = it },
+    )
+  }
 }
 
 @Composable
@@ -770,11 +1137,7 @@ private fun AccountMethodChips(
         PaymentMethod.BANK -> strings.bank
       }
       val bal = accountBalances.forMethod(method)
-      val balStr = if (bal < 0.0) {
-        "-${CurrencyFormat.format(-bal, currencySymbol)}"
-      } else {
-        CurrencyFormat.format(bal, currencySymbol)
-      }
+      val balStr = CurrencyFormat.formatSigned(bal, currencySymbol)
       FilterChip(
         selected = selected == method,
         onClick = { onSelect(method) },

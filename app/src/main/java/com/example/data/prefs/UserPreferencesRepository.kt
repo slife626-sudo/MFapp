@@ -34,6 +34,11 @@ data class UserSettings(
   val reminderMinute: Int = 0,
   val budgetAlertsEnabled: Boolean = true,
   val lastDriveBackupMillis: Long = 0L,
+  val showNotesInList: Boolean = true,
+  val use24HourTime: Boolean = false,
+  val pageSize: Int = 20,
+  val blurBalances: Boolean = false,
+  val hapticEnabled: Boolean = true,
 )
 
 class UserPreferencesRepository(private val context: Context) {
@@ -52,6 +57,11 @@ class UserPreferencesRepository(private val context: Context) {
     val REMINDER_MINUTE = intPreferencesKey("reminder_minute")
     val BUDGET_ALERTS_ENABLED = booleanPreferencesKey("budget_alerts_enabled")
     val LAST_DRIVE_BACKUP_MILLIS = longPreferencesKey("last_drive_backup_millis")
+    val SHOW_NOTES_IN_LIST = booleanPreferencesKey("show_notes_in_list")
+    val USE_24_HOUR_TIME = booleanPreferencesKey("use_24_hour_time")
+    val PAGE_SIZE = intPreferencesKey("page_size")
+    val BLUR_BALANCES = booleanPreferencesKey("blur_balances")
+    val HAPTIC_ENABLED = booleanPreferencesKey("haptic_enabled")
   }
 
   val settingsFlow: Flow<UserSettings> = context.hisabDataStore.data
@@ -77,6 +87,11 @@ class UserPreferencesRepository(private val context: Context) {
         reminderMinute = prefs[Keys.REMINDER_MINUTE] ?: 0,
         budgetAlertsEnabled = prefs[Keys.BUDGET_ALERTS_ENABLED] ?: true,
         lastDriveBackupMillis = prefs[Keys.LAST_DRIVE_BACKUP_MILLIS] ?: 0L,
+        showNotesInList = prefs[Keys.SHOW_NOTES_IN_LIST] ?: true,
+        use24HourTime = prefs[Keys.USE_24_HOUR_TIME] ?: false,
+        pageSize = prefs[Keys.PAGE_SIZE] ?: 20,
+        blurBalances = prefs[Keys.BLUR_BALANCES] ?: false,
+        hapticEnabled = prefs[Keys.HAPTIC_ENABLED] ?: true,
       )
     }
 
@@ -133,6 +148,26 @@ class UserPreferencesRepository(private val context: Context) {
 
   suspend fun setLastDriveBackupMillis(millis: Long) {
     context.hisabDataStore.edit { it[Keys.LAST_DRIVE_BACKUP_MILLIS] = millis }
+  }
+
+  suspend fun setShowNotesInList(enabled: Boolean) {
+    context.hisabDataStore.edit { it[Keys.SHOW_NOTES_IN_LIST] = enabled }
+  }
+
+  suspend fun setUse24HourTime(enabled: Boolean) {
+    context.hisabDataStore.edit { it[Keys.USE_24_HOUR_TIME] = enabled }
+  }
+
+  suspend fun setPageSize(size: Int) {
+    context.hisabDataStore.edit { it[Keys.PAGE_SIZE] = size }
+  }
+
+  suspend fun setBlurBalances(enabled: Boolean) {
+    context.hisabDataStore.edit { it[Keys.BLUR_BALANCES] = enabled }
+  }
+
+  suspend fun setHapticEnabled(enabled: Boolean) {
+    context.hisabDataStore.edit { it[Keys.HAPTIC_ENABLED] = enabled }
   }
 
   fun verifyPin(rawPin: String, storedHash: String): Boolean {

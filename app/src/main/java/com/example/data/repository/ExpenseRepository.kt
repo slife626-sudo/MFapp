@@ -5,6 +5,9 @@ import com.example.R
 import com.example.data.firebase.OperationType
 import com.example.data.firebase.handleFirestoreError
 import com.example.data.model.AccountTransfer
+import com.example.data.model.CategoryFlowType
+import com.example.data.model.CurrencyOption
+import com.example.data.model.CustomAccount
 import com.example.data.model.CustomCategory
 import com.example.data.model.DateFormatUtils
 import com.example.data.model.Expense
@@ -45,6 +48,8 @@ class ExpenseRepository(
       context.applicationContext.getString(R.string.firestore_database_id)
     )
   )
+
+  fun firestoreInstance(): FirebaseFirestore = db
 
   private fun requireMatchingUserId(expectedUserId: String): String {
     val uid = auth.currentUser?.uid
@@ -303,6 +308,7 @@ class ExpenseRepository(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    accountId: String? = null,
   ): Result<Unit> {
     var docPath = "users/$userId/expenses"
     return try {
@@ -318,18 +324,20 @@ class ExpenseRepository(
 
       val docRef = db.collection("users").document(uid).collection("expenses").document()
       docPath = docRef.path
-      val payload = mapOf(
-        "userId" to uid,
-        "title" to cleanTitle,
-        "amount" to amount,
-        "categoryId" to cleanCategory,
-        "paymentMethod" to paymentMethod.wireValue,
-        "note" to cleanNote,
-        "dateMillis" to validDateMillis,
-        "monthKey" to monthKey,
-        "createdAt" to FieldValue.serverTimestamp(),
-        "updatedAt" to FieldValue.serverTimestamp(),
-      )
+      val cleanAccountId = accountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+      val payload = buildMap<String, Any> {
+        put("userId", uid)
+        put("title", cleanTitle)
+        put("amount", amount)
+        put("categoryId", cleanCategory)
+        put("paymentMethod", paymentMethod.wireValue)
+        if (cleanAccountId != null) put("accountId", cleanAccountId)
+        put("note", cleanNote)
+        put("dateMillis", validDateMillis)
+        put("monthKey", monthKey)
+        put("createdAt", FieldValue.serverTimestamp())
+        put("updatedAt", FieldValue.serverTimestamp())
+      }
       docRef.set(payload).await()
       Result.success(Unit)
     } catch (e: CancellationException) {
@@ -349,6 +357,7 @@ class ExpenseRepository(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    accountId: String? = null,
   ): Result<Unit> {
     val docPath = "users/$userId/expenses/$expenseId"
     return try {
@@ -362,6 +371,7 @@ class ExpenseRepository(
       require(cleanTitle.isNotEmpty()) { "Title cannot be empty" }
       require(amount > 0.0 && amount <= 1_000_000_000.0) { "Amount out of valid range" }
 
+      val cleanAccountId = accountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
       val docRef = db.collection("users").document(uid).collection("expenses").document(expenseId)
       docRef.update(
         mapOf(
@@ -369,6 +379,7 @@ class ExpenseRepository(
           "amount" to amount,
           "categoryId" to cleanCategory,
           "paymentMethod" to paymentMethod.wireValue,
+          "accountId" to (cleanAccountId ?: FieldValue.delete()),
           "note" to cleanNote,
           "dateMillis" to validDateMillis,
           "monthKey" to monthKey,
@@ -407,6 +418,8 @@ class ExpenseRepository(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    categoryId: String? = null,
+    accountId: String? = null,
   ): Result<Unit> {
     var docPath = "users/$userId/incomes"
     return try {
@@ -418,19 +431,23 @@ class ExpenseRepository(
       require(cleanTitle.isNotEmpty()) { "Title cannot be empty" }
       require(amount > 0.0 && amount <= 1_000_000_000.0) { "Amount out of valid range" }
 
+      val cleanCategory = categoryId?.trim()?.take(64)?.takeIf { it.isNotEmpty() }
+      val cleanAccountId = accountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
       val docRef = db.collection("users").document(uid).collection("incomes").document()
       docPath = docRef.path
-      val payload = mapOf(
-        "userId" to uid,
-        "title" to cleanTitle,
-        "amount" to amount,
-        "paymentMethod" to paymentMethod.wireValue,
-        "note" to cleanNote,
-        "dateMillis" to validDateMillis,
-        "monthKey" to monthKey,
-        "createdAt" to FieldValue.serverTimestamp(),
-        "updatedAt" to FieldValue.serverTimestamp(),
-      )
+      val payload = buildMap<String, Any> {
+        put("userId", uid)
+        put("title", cleanTitle)
+        put("amount", amount)
+        if (cleanCategory != null) put("categoryId", cleanCategory)
+        put("paymentMethod", paymentMethod.wireValue)
+        if (cleanAccountId != null) put("accountId", cleanAccountId)
+        put("note", cleanNote)
+        put("dateMillis", validDateMillis)
+        put("monthKey", monthKey)
+        put("createdAt", FieldValue.serverTimestamp())
+        put("updatedAt", FieldValue.serverTimestamp())
+      }
       docRef.set(payload).await()
       Result.success(Unit)
     } catch (e: CancellationException) {
@@ -449,6 +466,8 @@ class ExpenseRepository(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    categoryId: String? = null,
+    accountId: String? = null,
   ): Result<Unit> {
     val docPath = "users/$userId/incomes/$incomeId"
     return try {
@@ -461,12 +480,16 @@ class ExpenseRepository(
       require(cleanTitle.isNotEmpty()) { "Title cannot be empty" }
       require(amount > 0.0 && amount <= 1_000_000_000.0) { "Amount out of valid range" }
 
+      val cleanCategory = categoryId?.trim()?.take(64)?.takeIf { it.isNotEmpty() }
+      val cleanAccountId = accountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
       val docRef = db.collection("users").document(uid).collection("incomes").document(incomeId)
       docRef.update(
         mapOf(
           "title" to cleanTitle,
           "amount" to amount,
+          "categoryId" to (cleanCategory ?: FieldValue.delete()),
           "paymentMethod" to paymentMethod.wireValue,
+          "accountId" to (cleanAccountId ?: FieldValue.delete()),
           "note" to cleanNote,
           "dateMillis" to validDateMillis,
           "monthKey" to monthKey,
@@ -505,11 +528,18 @@ class ExpenseRepository(
     amount: Double,
     note: String,
     dateMillis: Long,
+    fromAccountId: String? = null,
+    toAccountId: String? = null,
   ): Result<Unit> {
     var docPath = "users/$userId/transfers"
     return try {
       val uid = requireMatchingUserId(userId)
-      require(fromMethod != toMethod) { "Source and destination accounts must differ" }
+      val cleanFromAcc = fromAccountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+      val cleanToAcc = toAccountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+      val distinctCustomAccounts = cleanFromAcc != null && cleanToAcc != null && cleanFromAcc != cleanToAcc
+      require(fromMethod != toMethod || distinctCustomAccounts) {
+        "Source and destination accounts must differ"
+      }
       val cleanNote = note.trim().take(300)
       val validDateMillis = if (dateMillis > 0L) dateMillis else System.currentTimeMillis()
       val monthKey = DateFormatUtils.monthKeyFromMillis(validDateMillis)
@@ -517,17 +547,19 @@ class ExpenseRepository(
 
       val docRef = db.collection("users").document(uid).collection("transfers").document()
       docPath = docRef.path
-      val payload = mapOf(
-        "userId" to uid,
-        "fromMethod" to fromMethod.wireValue,
-        "toMethod" to toMethod.wireValue,
-        "amount" to amount,
-        "note" to cleanNote,
-        "dateMillis" to validDateMillis,
-        "monthKey" to monthKey,
-        "createdAt" to FieldValue.serverTimestamp(),
-        "updatedAt" to FieldValue.serverTimestamp(),
-      )
+      val payload = buildMap<String, Any> {
+        put("userId", uid)
+        put("fromMethod", fromMethod.wireValue)
+        put("toMethod", toMethod.wireValue)
+        if (cleanFromAcc != null) put("fromAccountId", cleanFromAcc)
+        if (cleanToAcc != null) put("toAccountId", cleanToAcc)
+        put("amount", amount)
+        put("note", cleanNote)
+        put("dateMillis", validDateMillis)
+        put("monthKey", monthKey)
+        put("createdAt", FieldValue.serverTimestamp())
+        put("updatedAt", FieldValue.serverTimestamp())
+      }
       docRef.set(payload).await()
       Result.success(Unit)
     } catch (e: CancellationException) {
@@ -546,12 +578,19 @@ class ExpenseRepository(
     amount: Double,
     note: String,
     dateMillis: Long,
+    fromAccountId: String? = null,
+    toAccountId: String? = null,
   ): Result<Unit> {
     val docPath = "users/$userId/transfers/$transferId"
     return try {
       val uid = requireMatchingUserId(userId)
       require(transferId.isNotBlank()) { "Transfer ID required" }
-      require(fromMethod != toMethod) { "Source and destination accounts must differ" }
+      val cleanFromAcc = fromAccountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+      val cleanToAcc = toAccountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+      val distinctCustomAccounts = cleanFromAcc != null && cleanToAcc != null && cleanFromAcc != cleanToAcc
+      require(fromMethod != toMethod || distinctCustomAccounts) {
+        "Source and destination accounts must differ"
+      }
       val cleanNote = note.trim().take(300)
       val validDateMillis = if (dateMillis > 0L) dateMillis else System.currentTimeMillis()
       val monthKey = DateFormatUtils.monthKeyFromMillis(validDateMillis)
@@ -562,6 +601,8 @@ class ExpenseRepository(
           mapOf(
             "fromMethod" to fromMethod.wireValue,
             "toMethod" to toMethod.wireValue,
+            "fromAccountId" to (cleanFromAcc ?: FieldValue.delete()),
+            "toAccountId" to (cleanToAcc ?: FieldValue.delete()),
             "amount" to amount,
             "note" to cleanNote,
             "dateMillis" to validDateMillis,
@@ -601,6 +642,8 @@ class ExpenseRepository(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    dueDateMillis: Long? = null,
+    accountId: String? = null,
   ): Result<Unit> {
     var docPath = "users/$userId/payables"
     return try {
@@ -612,21 +655,25 @@ class ExpenseRepository(
       require(cleanName.isNotEmpty()) { "Person name cannot be empty" }
       require(amount > 0.0 && amount <= 1_000_000_000.0) { "Amount out of valid range" }
 
+      val cleanAccountId = accountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+      val cleanDue = dueDateMillis?.takeIf { it > 0L }
       val docRef = db.collection("users").document(uid).collection("payables").document()
       docPath = docRef.path
-      val payload = mapOf(
-        "userId" to uid,
-        "personName" to cleanName,
-        "amount" to amount,
-        "paidAmount" to 0.0,
-        "paymentMethod" to paymentMethod.wireValue,
-        "note" to cleanNote,
-        "dateMillis" to validDateMillis,
-        "monthKey" to monthKey,
-        "settled" to false,
-        "createdAt" to FieldValue.serverTimestamp(),
-        "updatedAt" to FieldValue.serverTimestamp(),
-      )
+      val payload = buildMap<String, Any> {
+        put("userId", uid)
+        put("personName", cleanName)
+        put("amount", amount)
+        put("paidAmount", 0.0)
+        put("paymentMethod", paymentMethod.wireValue)
+        if (cleanAccountId != null) put("accountId", cleanAccountId)
+        put("note", cleanNote)
+        put("dateMillis", validDateMillis)
+        if (cleanDue != null) put("dueDateMillis", cleanDue)
+        put("monthKey", monthKey)
+        put("settled", false)
+        put("createdAt", FieldValue.serverTimestamp())
+        put("updatedAt", FieldValue.serverTimestamp())
+      }
       docRef.set(payload).await()
       Result.success(Unit)
     } catch (e: CancellationException) {
@@ -645,6 +692,8 @@ class ExpenseRepository(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    dueDateMillis: Long? = payable.dueDateMillis,
+    accountId: String? = payable.accountId,
   ): Result<Unit> {
     val docPath = "users/$userId/payables/${payable.id}"
     return try {
@@ -658,6 +707,8 @@ class ExpenseRepository(
       require(amount > 0.0 && amount <= 1_000_000_000.0) { "Amount out of valid range" }
       val clampedPaid = payable.paidAmount.coerceIn(0.0, 1_000_000_000.0)
       val isSettledNow = clampedPaid + 0.001 >= amount
+      val cleanAccountId = accountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+      val cleanDue = dueDateMillis?.takeIf { it > 0L }
 
       db.collection("users").document(uid).collection("payables").document(payable.id)
         .update(
@@ -666,8 +717,10 @@ class ExpenseRepository(
             "amount" to amount,
             "paidAmount" to clampedPaid,
             "paymentMethod" to paymentMethod.wireValue,
+            "accountId" to (cleanAccountId ?: FieldValue.delete()),
             "note" to cleanNote,
             "dateMillis" to validDateMillis,
+            "dueDateMillis" to (cleanDue ?: FieldValue.delete()),
             "monthKey" to monthKey,
             "settled" to isSettledNow,
             "updatedAt" to FieldValue.serverTimestamp(),
@@ -716,6 +769,7 @@ class ExpenseRepository(
     note: String,
     dateMillis: Long,
     currentPaidSum: Double,
+    accountId: String? = null,
   ): Result<Unit> {
     val docPath = "users/$userId/payablePayments"
     return try {
@@ -728,24 +782,24 @@ class ExpenseRepository(
 
       val newPaid = (currentPaidSum + amount).coerceIn(0.0, 1_000_000_000.0)
       val isSettledNow = newPaid + 0.001 >= payable.amount
+      val cleanAccountId = accountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
 
       val batch = db.batch()
       val paymentRef = db.collection("users").document(uid).collection("payablePayments").document()
-      batch.set(
-        paymentRef,
-        mapOf(
-          "userId" to uid,
-          "payableId" to payable.id,
-          "personName" to payable.personName.trim().take(120).ifEmpty { "Lender" },
-          "amount" to amount,
-          "paymentMethod" to paymentMethod.wireValue,
-          "note" to cleanNote,
-          "dateMillis" to validDateMillis,
-          "monthKey" to monthKey,
-          "createdAt" to FieldValue.serverTimestamp(),
-          "updatedAt" to FieldValue.serverTimestamp(),
-        ),
-      )
+      val paymentPayload = buildMap<String, Any> {
+        put("userId", uid)
+        put("payableId", payable.id)
+        put("personName", payable.personName.trim().take(120).ifEmpty { "Lender" })
+        put("amount", amount)
+        put("paymentMethod", paymentMethod.wireValue)
+        if (cleanAccountId != null) put("accountId", cleanAccountId)
+        put("note", cleanNote)
+        put("dateMillis", validDateMillis)
+        put("monthKey", monthKey)
+        put("createdAt", FieldValue.serverTimestamp())
+        put("updatedAt", FieldValue.serverTimestamp())
+      }
+      batch.set(paymentRef, paymentPayload)
       val payableRef = db.collection("users").document(uid).collection("payables").document(payable.id)
       batch.update(
         payableRef,
@@ -806,6 +860,8 @@ class ExpenseRepository(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    dueDateMillis: Long? = null,
+    accountId: String? = null,
   ): Result<Unit> {
     var docPath = "users/$userId/receivables"
     return try {
@@ -817,21 +873,25 @@ class ExpenseRepository(
       require(cleanName.isNotEmpty()) { "Person name cannot be empty" }
       require(amount > 0.0 && amount <= 1_000_000_000.0) { "Amount out of valid range" }
 
+      val cleanAccountId = accountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+      val cleanDue = dueDateMillis?.takeIf { it > 0L }
       val docRef = db.collection("users").document(uid).collection("receivables").document()
       docPath = docRef.path
-      val payload = mapOf(
-        "userId" to uid,
-        "personName" to cleanName,
-        "amount" to amount,
-        "collectedAmount" to 0.0,
-        "paymentMethod" to paymentMethod.wireValue,
-        "note" to cleanNote,
-        "dateMillis" to validDateMillis,
-        "monthKey" to monthKey,
-        "settled" to false,
-        "createdAt" to FieldValue.serverTimestamp(),
-        "updatedAt" to FieldValue.serverTimestamp(),
-      )
+      val payload = buildMap<String, Any> {
+        put("userId", uid)
+        put("personName", cleanName)
+        put("amount", amount)
+        put("collectedAmount", 0.0)
+        put("paymentMethod", paymentMethod.wireValue)
+        if (cleanAccountId != null) put("accountId", cleanAccountId)
+        put("note", cleanNote)
+        put("dateMillis", validDateMillis)
+        if (cleanDue != null) put("dueDateMillis", cleanDue)
+        put("monthKey", monthKey)
+        put("settled", false)
+        put("createdAt", FieldValue.serverTimestamp())
+        put("updatedAt", FieldValue.serverTimestamp())
+      }
       docRef.set(payload).await()
       Result.success(Unit)
     } catch (e: CancellationException) {
@@ -850,6 +910,8 @@ class ExpenseRepository(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    dueDateMillis: Long? = receivable.dueDateMillis,
+    accountId: String? = receivable.accountId,
   ): Result<Unit> {
     val docPath = "users/$userId/receivables/${receivable.id}"
     return try {
@@ -863,6 +925,8 @@ class ExpenseRepository(
       require(amount > 0.0 && amount <= 1_000_000_000.0) { "Amount out of valid range" }
       val clampedCollected = receivable.collectedAmount.coerceIn(0.0, 1_000_000_000.0)
       val isSettledNow = clampedCollected + 0.001 >= amount
+      val cleanAccountId = accountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+      val cleanDue = dueDateMillis?.takeIf { it > 0L }
 
       db.collection("users").document(uid).collection("receivables").document(receivable.id)
         .update(
@@ -871,8 +935,10 @@ class ExpenseRepository(
             "amount" to amount,
             "collectedAmount" to clampedCollected,
             "paymentMethod" to paymentMethod.wireValue,
+            "accountId" to (cleanAccountId ?: FieldValue.delete()),
             "note" to cleanNote,
             "dateMillis" to validDateMillis,
+            "dueDateMillis" to (cleanDue ?: FieldValue.delete()),
             "monthKey" to monthKey,
             "settled" to isSettledNow,
             "updatedAt" to FieldValue.serverTimestamp(),
@@ -921,6 +987,7 @@ class ExpenseRepository(
     note: String,
     dateMillis: Long,
     currentCollectedSum: Double,
+    accountId: String? = null,
   ): Result<Unit> {
     val docPath = "users/$userId/receivablePayments"
     return try {
@@ -933,24 +1000,24 @@ class ExpenseRepository(
 
       val newCollected = (currentCollectedSum + amount).coerceIn(0.0, 1_000_000_000.0)
       val isSettledNow = newCollected + 0.001 >= receivable.amount
+      val cleanAccountId = accountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
 
       val batch = db.batch()
       val paymentRef = db.collection("users").document(uid).collection("receivablePayments").document()
-      batch.set(
-        paymentRef,
-        mapOf(
-          "userId" to uid,
-          "receivableId" to receivable.id,
-          "personName" to receivable.personName.trim().take(120).ifEmpty { "Borrower" },
-          "amount" to amount,
-          "paymentMethod" to paymentMethod.wireValue,
-          "note" to cleanNote,
-          "dateMillis" to validDateMillis,
-          "monthKey" to monthKey,
-          "createdAt" to FieldValue.serverTimestamp(),
-          "updatedAt" to FieldValue.serverTimestamp(),
-        ),
-      )
+      val paymentPayload = buildMap<String, Any> {
+        put("userId", uid)
+        put("receivableId", receivable.id)
+        put("personName", receivable.personName.trim().take(120).ifEmpty { "Borrower" })
+        put("amount", amount)
+        put("paymentMethod", paymentMethod.wireValue)
+        if (cleanAccountId != null) put("accountId", cleanAccountId)
+        put("note", cleanNote)
+        put("dateMillis", validDateMillis)
+        put("monthKey", monthKey)
+        put("createdAt", FieldValue.serverTimestamp())
+        put("updatedAt", FieldValue.serverTimestamp())
+      }
+      batch.set(paymentRef, paymentPayload)
       val receivableRef = db.collection("users").document(uid).collection("receivables").document(receivable.id)
       batch.update(
         receivableRef,
@@ -1009,6 +1076,7 @@ class ExpenseRepository(
     name: String,
     iconKey: String,
     colorHex: Long,
+    categoryType: CategoryFlowType = CategoryFlowType.EXPENSE,
   ): Result<Unit> {
     var docPath = "users/$userId/categories"
     return try {
@@ -1023,6 +1091,7 @@ class ExpenseRepository(
           "name" to cleanName,
           "iconKey" to iconKey.trim().take(32).ifEmpty { "other" },
           "colorHex" to colorHex,
+          "categoryType" to categoryType.wireValue,
           "createdAt" to FieldValue.serverTimestamp(),
           "updatedAt" to FieldValue.serverTimestamp(),
         )
@@ -1036,6 +1105,39 @@ class ExpenseRepository(
     }
   }
 
+  suspend fun updateCustomCategory(
+    userId: String,
+    categoryId: String,
+    name: String,
+    iconKey: String,
+    colorHex: Long,
+    categoryType: CategoryFlowType,
+  ): Result<Unit> {
+    val docPath = "users/$userId/categories/$categoryId"
+    return try {
+      val uid = requireMatchingUserId(userId)
+      require(categoryId.isNotBlank()) { "Category ID required" }
+      val cleanName = name.trim().take(40)
+      require(cleanName.isNotEmpty()) { "Category name cannot be empty" }
+      db.collection("users").document(uid).collection("categories").document(categoryId)
+        .update(
+          mapOf(
+            "name" to cleanName,
+            "iconKey" to iconKey.trim().take(32).ifEmpty { "other" },
+            "colorHex" to colorHex,
+            "categoryType" to categoryType.wireValue,
+            "updatedAt" to FieldValue.serverTimestamp(),
+          )
+        ).await()
+      Result.success(Unit)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      handleFirestoreError(e, OperationType.UPDATE, docPath)
+      Result.failure(e)
+    }
+  }
+
   suspend fun deleteCustomCategory(userId: String, categoryId: String): Result<Unit> {
     val docPath = "users/$userId/categories/$categoryId"
     return try {
@@ -1043,6 +1145,27 @@ class ExpenseRepository(
       require(categoryId.isNotBlank()) { "Category ID required" }
       db.collection("users").document(uid).collection("categories").document(categoryId)
         .delete().await()
+      Result.success(Unit)
+    } catch (e: CancellationException) {
+      throw e
+    } catch (e: Exception) {
+      handleFirestoreError(e, OperationType.DELETE, docPath)
+      Result.failure(e)
+    }
+  }
+
+  suspend fun bulkDeleteCustomCategories(userId: String, categoryIds: List<String>): Result<Unit> {
+    val docPath = "users/$userId/categories"
+    return try {
+      val uid = requireMatchingUserId(userId)
+      val cleanIds = categoryIds.filter { it.isNotBlank() }
+      for (chunk in cleanIds.chunked(450)) {
+        val batch = db.batch()
+        for (id in chunk) {
+          batch.delete(db.collection("users").document(uid).collection("categories").document(id))
+        }
+        batch.commit().await()
+      }
       Result.success(Unit)
     } catch (e: CancellationException) {
       throw e
@@ -1132,21 +1255,66 @@ class ExpenseRepository(
     payablePayments: List<PayablePayment> = emptyList(),
     receivables: List<Receivable> = emptyList(),
     receivablePayments: List<ReceivablePayment> = emptyList(),
+    customAccounts: List<CustomAccount> = emptyList(),
+    existingAccountIds: Set<String> = emptySet(),
   ): Result<Int> {
     return try {
       val uid = requireMatchingUserId(userId)
       var importedCount = 0
 
+      for (acct in customAccounts) {
+        val safeId = sanitizeId(acct.id)
+        val cleanName = acct.name.trim().take(60)
+        if (cleanName.isNotEmpty()) {
+          val colRef = db.collection("users").document(uid).collection("accounts")
+          val docRef = if (safeId.isNotEmpty()) colRef.document(safeId) else colRef.document()
+          val safeIcon = acct.iconKey.trim().take(32).ifEmpty { "wallet" }
+          val safeBalance = acct.openingBalance.coerceIn(-1_000_000_000.0, 1_000_000_000.0)
+          val safeCurrency = acct.currencyCode.trim().take(8).ifEmpty { CurrencyOption.BDT.code }
+          if (safeId.isNotEmpty() && safeId in existingAccountIds) {
+            docRef.update(
+              mapOf(
+                "name" to cleanName,
+                "accountType" to PaymentMethod.fromWire(acct.accountType).wireValue,
+                "iconKey" to safeIcon,
+                "colorHex" to acct.colorHex,
+                "openingBalance" to safeBalance,
+                "currencyCode" to safeCurrency,
+                "custom" to acct.custom,
+                "updatedAt" to FieldValue.serverTimestamp(),
+              )
+            ).await()
+          } else {
+            docRef.set(
+              mapOf(
+                "userId" to uid,
+                "name" to cleanName,
+                "accountType" to PaymentMethod.fromWire(acct.accountType).wireValue,
+                "iconKey" to safeIcon,
+                "colorHex" to acct.colorHex,
+                "openingBalance" to safeBalance,
+                "currencyCode" to safeCurrency,
+                "custom" to acct.custom,
+                "createdAt" to FieldValue.serverTimestamp(),
+                "updatedAt" to FieldValue.serverTimestamp(),
+              )
+            ).await()
+          }
+        }
+      }
+
       for (cat in customCategories) {
         val safeId = sanitizeId(cat.id)
         if (safeId.isNotEmpty() && cat.name.isNotBlank()) {
           val docRef = db.collection("users").document(uid).collection("categories").document(safeId)
+          val catType = CategoryFlowType.fromWire(cat.categoryType).wireValue
           if (safeId in existingCategoryIds) {
             docRef.update(
               mapOf(
                 "name" to cat.name.trim().take(40),
                 "iconKey" to cat.iconKey.trim().take(32).ifEmpty { "other" },
                 "colorHex" to cat.colorHex,
+                "categoryType" to catType,
                 "updatedAt" to FieldValue.serverTimestamp(),
               )
             ).await()
@@ -1157,6 +1325,7 @@ class ExpenseRepository(
                 "name" to cat.name.trim().take(40),
                 "iconKey" to cat.iconKey.trim().take(32).ifEmpty { "other" },
                 "colorHex" to cat.colorHex,
+                "categoryType" to catType,
                 "createdAt" to FieldValue.serverTimestamp(),
                 "updatedAt" to FieldValue.serverTimestamp(),
               )
@@ -1187,20 +1356,21 @@ class ExpenseRepository(
         val safeId = sanitizeId(exp.id)
         val colRef = db.collection("users").document(uid).collection("expenses")
         val docRef = if (safeId.isNotEmpty()) colRef.document(safeId) else colRef.document()
-        docRef.set(
-          mapOf(
-            "userId" to uid,
-            "title" to safeTitle,
-            "amount" to exp.amount.coerceIn(0.01, 1_000_000_000.0),
-            "categoryId" to exp.categoryId.trim().take(64).ifEmpty { "other" },
-            "paymentMethod" to PaymentMethod.fromWire(exp.paymentMethod).wireValue,
-            "note" to exp.note.trim().take(300),
-            "dateMillis" to validDate,
-            "monthKey" to monthKey,
-            "createdAt" to FieldValue.serverTimestamp(),
-            "updatedAt" to FieldValue.serverTimestamp(),
-          )
-        ).await()
+        val cleanAcc = exp.accountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+        val payload = buildMap<String, Any> {
+          put("userId", uid)
+          put("title", safeTitle)
+          put("amount", exp.amount.coerceIn(0.01, 1_000_000_000.0))
+          put("categoryId", exp.categoryId.trim().take(64).ifEmpty { "other" })
+          put("paymentMethod", PaymentMethod.fromWire(exp.paymentMethod).wireValue)
+          if (cleanAcc != null) put("accountId", cleanAcc)
+          put("note", exp.note.trim().take(300))
+          put("dateMillis", validDate)
+          put("monthKey", monthKey)
+          put("createdAt", FieldValue.serverTimestamp())
+          put("updatedAt", FieldValue.serverTimestamp())
+        }
+        docRef.set(payload).await()
         importedCount++
       }
 
@@ -1212,44 +1382,51 @@ class ExpenseRepository(
         val safeId = sanitizeId(inc.id)
         val colRef = db.collection("users").document(uid).collection("incomes")
         val docRef = if (safeId.isNotEmpty()) colRef.document(safeId) else colRef.document()
-        docRef.set(
-          mapOf(
-            "userId" to uid,
-            "title" to safeTitle,
-            "amount" to inc.amount.coerceIn(0.01, 1_000_000_000.0),
-            "paymentMethod" to PaymentMethod.fromWire(inc.paymentMethod).wireValue,
-            "note" to inc.note.trim().take(300),
-            "dateMillis" to validDate,
-            "monthKey" to monthKey,
-            "createdAt" to FieldValue.serverTimestamp(),
-            "updatedAt" to FieldValue.serverTimestamp(),
-          )
-        ).await()
+        val cleanCat = inc.categoryId?.trim()?.take(64)?.takeIf { it.isNotEmpty() }
+        val cleanAcc = inc.accountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+        val payload = buildMap<String, Any> {
+          put("userId", uid)
+          put("title", safeTitle)
+          put("amount", inc.amount.coerceIn(0.01, 1_000_000_000.0))
+          if (cleanCat != null) put("categoryId", cleanCat)
+          put("paymentMethod", PaymentMethod.fromWire(inc.paymentMethod).wireValue)
+          if (cleanAcc != null) put("accountId", cleanAcc)
+          put("note", inc.note.trim().take(300))
+          put("dateMillis", validDate)
+          put("monthKey", monthKey)
+          put("createdAt", FieldValue.serverTimestamp())
+          put("updatedAt", FieldValue.serverTimestamp())
+        }
+        docRef.set(payload).await()
         importedCount++
       }
 
       for (tr in transfers) {
         val fromM = PaymentMethod.fromWire(tr.fromMethod)
         val toM = PaymentMethod.fromWire(tr.toMethod)
-        if (fromM == toM || tr.amount <= 0.0) continue
+        val fromAcc = tr.fromAccountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+        val toAcc = tr.toAccountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+        val distinctAccs = fromAcc != null && toAcc != null && fromAcc != toAcc
+        if ((fromM == toM && !distinctAccs) || tr.amount <= 0.0) continue
         val validDate = if (tr.dateMillis > 0L) tr.dateMillis else System.currentTimeMillis()
         val monthKey = DateFormatUtils.monthKeyFromMillis(validDate)
         val safeId = sanitizeId(tr.id)
         val colRef = db.collection("users").document(uid).collection("transfers")
         val docRef = if (safeId.isNotEmpty()) colRef.document(safeId) else colRef.document()
-        docRef.set(
-          mapOf(
-            "userId" to uid,
-            "fromMethod" to fromM.wireValue,
-            "toMethod" to toM.wireValue,
-            "amount" to tr.amount.coerceIn(0.01, 1_000_000_000.0),
-            "note" to tr.note.trim().take(300),
-            "dateMillis" to validDate,
-            "monthKey" to monthKey,
-            "createdAt" to FieldValue.serverTimestamp(),
-            "updatedAt" to FieldValue.serverTimestamp(),
-          )
-        ).await()
+        val payload = buildMap<String, Any> {
+          put("userId", uid)
+          put("fromMethod", fromM.wireValue)
+          put("toMethod", toM.wireValue)
+          if (fromAcc != null) put("fromAccountId", fromAcc)
+          if (toAcc != null) put("toAccountId", toAcc)
+          put("amount", tr.amount.coerceIn(0.01, 1_000_000_000.0))
+          put("note", tr.note.trim().take(300))
+          put("dateMillis", validDate)
+          put("monthKey", monthKey)
+          put("createdAt", FieldValue.serverTimestamp())
+          put("updatedAt", FieldValue.serverTimestamp())
+        }
+        docRef.set(payload).await()
         importedCount++
       }
 
@@ -1261,21 +1438,24 @@ class ExpenseRepository(
         val safeId = sanitizeId(pay.id)
         val colRef = db.collection("users").document(uid).collection("payables")
         val docRef = if (safeId.isNotEmpty()) colRef.document(safeId) else colRef.document()
-        docRef.set(
-          mapOf(
-            "userId" to uid,
-            "personName" to safeName,
-            "amount" to pay.amount.coerceIn(0.01, 1_000_000_000.0),
-            "paidAmount" to pay.paidAmount.coerceIn(0.0, 1_000_000_000.0),
-            "paymentMethod" to PaymentMethod.fromWire(pay.paymentMethod).wireValue,
-            "note" to pay.note.trim().take(300),
-            "dateMillis" to validDate,
-            "monthKey" to monthKey,
-            "settled" to pay.settled,
-            "createdAt" to FieldValue.serverTimestamp(),
-            "updatedAt" to FieldValue.serverTimestamp(),
-          )
-        ).await()
+        val cleanAcc = pay.accountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+        val cleanDue = pay.dueDateMillis?.takeIf { it > 0L }
+        val payload = buildMap<String, Any> {
+          put("userId", uid)
+          put("personName", safeName)
+          put("amount", pay.amount.coerceIn(0.01, 1_000_000_000.0))
+          put("paidAmount", pay.paidAmount.coerceIn(0.0, 1_000_000_000.0))
+          put("paymentMethod", PaymentMethod.fromWire(pay.paymentMethod).wireValue)
+          if (cleanAcc != null) put("accountId", cleanAcc)
+          put("note", pay.note.trim().take(300))
+          put("dateMillis", validDate)
+          if (cleanDue != null) put("dueDateMillis", cleanDue)
+          put("monthKey", monthKey)
+          put("settled", pay.settled)
+          put("createdAt", FieldValue.serverTimestamp())
+          put("updatedAt", FieldValue.serverTimestamp())
+        }
+        docRef.set(payload).await()
         importedCount++
       }
 
@@ -1288,20 +1468,21 @@ class ExpenseRepository(
         val safeId = sanitizeId(pmt.id)
         val colRef = db.collection("users").document(uid).collection("payablePayments")
         val docRef = if (safeId.isNotEmpty()) colRef.document(safeId) else colRef.document()
-        docRef.set(
-          mapOf(
-            "userId" to uid,
-            "payableId" to safePayableId,
-            "personName" to safeName,
-            "amount" to pmt.amount.coerceIn(0.01, 1_000_000_000.0),
-            "paymentMethod" to PaymentMethod.fromWire(pmt.paymentMethod).wireValue,
-            "note" to pmt.note.trim().take(300),
-            "dateMillis" to validDate,
-            "monthKey" to monthKey,
-            "createdAt" to FieldValue.serverTimestamp(),
-            "updatedAt" to FieldValue.serverTimestamp(),
-          )
-        ).await()
+        val cleanAcc = pmt.accountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+        val payload = buildMap<String, Any> {
+          put("userId", uid)
+          put("payableId", safePayableId)
+          put("personName", safeName)
+          put("amount", pmt.amount.coerceIn(0.01, 1_000_000_000.0))
+          put("paymentMethod", PaymentMethod.fromWire(pmt.paymentMethod).wireValue)
+          if (cleanAcc != null) put("accountId", cleanAcc)
+          put("note", pmt.note.trim().take(300))
+          put("dateMillis", validDate)
+          put("monthKey", monthKey)
+          put("createdAt", FieldValue.serverTimestamp())
+          put("updatedAt", FieldValue.serverTimestamp())
+        }
+        docRef.set(payload).await()
         importedCount++
       }
 
@@ -1313,21 +1494,24 @@ class ExpenseRepository(
         val safeId = sanitizeId(rec.id)
         val colRef = db.collection("users").document(uid).collection("receivables")
         val docRef = if (safeId.isNotEmpty()) colRef.document(safeId) else colRef.document()
-        docRef.set(
-          mapOf(
-            "userId" to uid,
-            "personName" to safeName,
-            "amount" to rec.amount.coerceIn(0.01, 1_000_000_000.0),
-            "collectedAmount" to rec.collectedAmount.coerceIn(0.0, 1_000_000_000.0),
-            "paymentMethod" to PaymentMethod.fromWire(rec.paymentMethod).wireValue,
-            "note" to rec.note.trim().take(300),
-            "dateMillis" to validDate,
-            "monthKey" to monthKey,
-            "settled" to rec.settled,
-            "createdAt" to FieldValue.serverTimestamp(),
-            "updatedAt" to FieldValue.serverTimestamp(),
-          )
-        ).await()
+        val cleanAcc = rec.accountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+        val cleanDue = rec.dueDateMillis?.takeIf { it > 0L }
+        val payload = buildMap<String, Any> {
+          put("userId", uid)
+          put("personName", safeName)
+          put("amount", rec.amount.coerceIn(0.01, 1_000_000_000.0))
+          put("collectedAmount", rec.collectedAmount.coerceIn(0.0, 1_000_000_000.0))
+          put("paymentMethod", PaymentMethod.fromWire(rec.paymentMethod).wireValue)
+          if (cleanAcc != null) put("accountId", cleanAcc)
+          put("note", rec.note.trim().take(300))
+          put("dateMillis", validDate)
+          if (cleanDue != null) put("dueDateMillis", cleanDue)
+          put("monthKey", monthKey)
+          put("settled", rec.settled)
+          put("createdAt", FieldValue.serverTimestamp())
+          put("updatedAt", FieldValue.serverTimestamp())
+        }
+        docRef.set(payload).await()
         importedCount++
       }
 
@@ -1340,20 +1524,21 @@ class ExpenseRepository(
         val safeId = sanitizeId(pmt.id)
         val colRef = db.collection("users").document(uid).collection("receivablePayments")
         val docRef = if (safeId.isNotEmpty()) colRef.document(safeId) else colRef.document()
-        docRef.set(
-          mapOf(
-            "userId" to uid,
-            "receivableId" to safeReceivableId,
-            "personName" to safeName,
-            "amount" to pmt.amount.coerceIn(0.01, 1_000_000_000.0),
-            "paymentMethod" to PaymentMethod.fromWire(pmt.paymentMethod).wireValue,
-            "note" to pmt.note.trim().take(300),
-            "dateMillis" to validDate,
-            "monthKey" to monthKey,
-            "createdAt" to FieldValue.serverTimestamp(),
-            "updatedAt" to FieldValue.serverTimestamp(),
-          )
-        ).await()
+        val cleanAcc = pmt.accountId?.trim()?.take(128)?.takeIf { it.isNotEmpty() }
+        val payload = buildMap<String, Any> {
+          put("userId", uid)
+          put("receivableId", safeReceivableId)
+          put("personName", safeName)
+          put("amount", pmt.amount.coerceIn(0.01, 1_000_000_000.0))
+          put("paymentMethod", PaymentMethod.fromWire(pmt.paymentMethod).wireValue)
+          if (cleanAcc != null) put("accountId", cleanAcc)
+          put("note", pmt.note.trim().take(300))
+          put("dateMillis", validDate)
+          put("monthKey", monthKey)
+          put("createdAt", FieldValue.serverTimestamp())
+          put("updatedAt", FieldValue.serverTimestamp())
+        }
+        docRef.set(payload).await()
         importedCount++
       }
 

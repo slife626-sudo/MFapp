@@ -13,9 +13,10 @@ import com.example.data.backup.DriveBackupFile
 import com.example.data.backup.GoogleDriveBackupManager
 import com.example.data.model.AccountTransfer
 import com.example.data.model.CategoryCatalog
-import com.example.data.model.CategoryItem
+import com.example.data.model.CategoryFlowType
 import com.example.data.model.CurrencyFormat
 import com.example.data.model.CurrencyOption
+import com.example.data.model.CustomAccount
 import com.example.data.model.CustomCategory
 import com.example.data.model.DateFormatUtils
 import com.example.data.model.Expense
@@ -26,11 +27,14 @@ import com.example.data.model.MonthlyBudget
 import com.example.data.model.Payable
 import com.example.data.model.PayablePayment
 import com.example.data.model.PaymentMethod
+import com.example.data.model.PeriodFilter
 import com.example.data.model.Receivable
 import com.example.data.model.ReceivablePayment
+import com.example.data.model.TrashItem
 import com.example.data.model.UiState
 import com.example.data.prefs.UserPreferencesRepository
 import com.example.data.prefs.UserSettings
+import com.example.data.repository.AccountAndTrashRepository
 import com.example.data.repository.ExpenseRepository
 import com.example.data.repository.MarketListRepository
 import com.example.data.repository.SyncSnapshot
@@ -55,99 +59,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.Calendar
-
-data class CategoryBreakdown(
-  val category: CategoryItem,
-  val totalAmount: Double,
-  val percentage: Float,
-  val transactionCount: Int,
-  val budgetLimit: Double,
-)
-
-data class MonthlySummary(
-  val monthKey: String,
-  val totalSpent: Double,
-  val totalIncome: Double,
-  val netBalance: Double,
-  val prevMonthSpent: Double,
-  val transactionCount: Int,
-  val dailyAverage: Double,
-  val topCategory: CategoryBreakdown?,
-  val budgetLimit: Double,
-  val categoryBreakdowns: List<CategoryBreakdown>,
-  val dailyTotals: Map<Int, Double>,
-  val sixMonthTotals: List<Pair<String, Double>>,
-)
-
-data class AccountBalances(
-  val cash: Double = 0.0,
-  val bank: Double = 0.0,
-  val mobile: Double = 0.0,
-  val card: Double = 0.0,
-) {
-  fun forMethod(method: PaymentMethod): Double = when (method) {
-    PaymentMethod.CASH -> cash
-    PaymentMethod.BANK -> bank
-    PaymentMethod.MOBILE -> mobile
-    PaymentMethod.CARD -> card
-  }
-
-  val total: Double get() = cash + bank + mobile + card
-}
-
-data class DashboardUiData(
-  val expenses: List<Expense>,
-  val incomes: List<Income>,
-  val transfers: List<AccountTransfer> = emptyList(),
-  val payables: List<Payable> = emptyList(),
-  val payablePayments: List<PayablePayment> = emptyList(),
-  val receivables: List<Receivable> = emptyList(),
-  val receivablePayments: List<ReceivablePayment> = emptyList(),
-  val customCategories: List<CustomCategory>,
-  val budgets: List<MonthlyBudget>,
-  val hasPendingWrites: Boolean,
-  val isFromCache: Boolean,
-) {
-  fun accountBalances(): AccountBalances {
-    fun balanceFor(method: PaymentMethod): Double {
-      val inc = incomes.filter { PaymentMethod.fromWire(it.paymentMethod) == method }.sumOf { it.amount }
-      val exp = expenses.filter { PaymentMethod.fromWire(it.paymentMethod) == method }.sumOf { it.amount }
-      val trIn = transfers.filter { PaymentMethod.fromWire(it.toMethod) == method }.sumOf { it.amount }
-      val trOut = transfers.filter { PaymentMethod.fromWire(it.fromMethod) == method }.sumOf { it.amount }
-      val borrowed = payables.filter { PaymentMethod.fromWire(it.paymentMethod) == method }.sumOf { it.amount }
-      val repaid = payablePayments.filter { PaymentMethod.fromWire(it.paymentMethod) == method }.sumOf { it.amount }
-      val lentOut = receivables.filter { PaymentMethod.fromWire(it.paymentMethod) == method }.sumOf { it.amount }
-      val collectedBack = receivablePayments.filter { PaymentMethod.fromWire(it.paymentMethod) == method }.sumOf { it.amount }
-      return inc - exp + trIn - trOut + borrowed - repaid - lentOut + collectedBack
-    }
-    return AccountBalances(
-      cash = balanceFor(PaymentMethod.CASH),
-      bank = balanceFor(PaymentMethod.BANK),
-      mobile = balanceFor(PaymentMethod.MOBILE),
-      card = balanceFor(PaymentMethod.CARD),
-    )
-  }
-
-  fun paidAmountForPayable(payable: Payable): Double {
-    val matching = payablePayments.filter { it.payableId == payable.id }
-    return if (matching.isNotEmpty()) matching.sumOf { it.amount } else payable.paidAmount
-  }
-
-  fun totalUnpaidPayables(): Double =
-    payables.sumOf { p -> (p.amount - paidAmountForPayable(p)).coerceAtLeast(0.0) }
-
-  fun collectedAmountForReceivable(receivable: Receivable): Double {
-    val matching = receivablePayments.filter { it.receivableId == receivable.id }
-    return if (matching.isNotEmpty()) matching.sumOf { it.amount } else receivable.collectedAmount
-  }
-
-  fun totalUnpaidReceivables(): Double =
-    receivables.sumOf { r -> (r.amount - collectedAmountForReceivable(r)).coerceAtLeast(0.0) }
-}
 
 private data class WalletOpsSnapshot(
   val transfers: SyncSnapshot<AccountTransfer>,
@@ -155,6 +68,8 @@ private data class WalletOpsSnapshot(
   val payablePayments: SyncSnapshot<PayablePayment>,
   val receivables: SyncSnapshot<Receivable>,
   val receivablePayments: SyncSnapshot<ReceivablePayment>,
+  val accounts: SyncSnapshot<CustomAccount>,
+  val trashItems: List<TrashItem>,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -166,6 +81,7 @@ class HisabViewModel(
   private val currentUserId: String,
   private val currentUserEmail: String = "",
   private val currentUserName: String = "",
+  private val accountTrashRepository: AccountAndTrashRepository = AccountAndTrashRepository(repository.firestoreInstance()),
 ) : ViewModel() {
 
   val settings: StateFlow<UserSettings> = prefsRepo.settingsFlow
@@ -176,6 +92,9 @@ class HisabViewModel(
 
   private val _selectedMonthKey = MutableStateFlow(DateFormatUtils.currentMonthKey())
   val selectedMonthKey: StateFlow<String> = _selectedMonthKey.asStateFlow()
+
+  private val _selectedPeriodFilter = MutableStateFlow(PeriodFilter.THIS_MONTH)
+  val selectedPeriodFilter: StateFlow<PeriodFilter> = _selectedPeriodFilter.asStateFlow()
 
   private val _selectedCategoryFilter = MutableStateFlow<String?>(null)
   val selectedCategoryFilter: StateFlow<String?> = _selectedCategoryFilter.asStateFlow()
@@ -199,6 +118,7 @@ class HisabViewModel(
   val messages = _messages.asSharedFlow()
 
   private var pinInitialized = false
+  private var trashAutoPurged = false
 
   val marketLists: StateFlow<List<MarketList>> = marketRepository
     .observeMarketLists(currentUserId, currentUserEmail)
@@ -230,14 +150,31 @@ class HisabViewModel(
     }
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
-  private val walletOpsFlow = combine(
+  private val debtFlows = combine(
     repository.observeTransfers(currentUserId),
     repository.observePayables(currentUserId),
     repository.observePayablePayments(currentUserId),
     repository.observeReceivables(currentUserId),
     repository.observeReceivablePayments(currentUserId),
   ) { trSnap, paySnap, pmtSnap, recSnap, recPmtSnap ->
-    WalletOpsSnapshot(trSnap, paySnap, pmtSnap, recSnap, recPmtSnap)
+    listOf(trSnap, paySnap, pmtSnap, recSnap, recPmtSnap)
+  }
+
+  @Suppress("UNCHECKED_CAST")
+  private val walletOpsFlow = combine(
+    debtFlows,
+    accountTrashRepository.observeAccounts(currentUserId),
+    accountTrashRepository.observeTrash(currentUserId),
+  ) { debtList, accountsSnap, trashItems ->
+    WalletOpsSnapshot(
+      transfers = debtList[0] as SyncSnapshot<AccountTransfer>,
+      payables = debtList[1] as SyncSnapshot<Payable>,
+      payablePayments = debtList[2] as SyncSnapshot<PayablePayment>,
+      receivables = debtList[3] as SyncSnapshot<Receivable>,
+      receivablePayments = debtList[4] as SyncSnapshot<ReceivablePayment>,
+      accounts = accountsSnap,
+      trashItems = trashItems,
+    )
   }
 
   val dashboardState: StateFlow<UiState<DashboardUiData>> = combine(
@@ -247,32 +184,45 @@ class HisabViewModel(
     repository.observeCustomCategories(currentUserId),
     repository.observeBudgets(currentUserId),
   ) { expSnap: SyncSnapshot<Expense>, incSnap: SyncSnapshot<Income>, walletOps, cats: List<CustomCategory>, budgets: List<MonthlyBudget> ->
-    val (trSnap, paySnap, pmtSnap, recSnap, recPmtSnap) = walletOps
+    if (!trashAutoPurged && walletOps.trashItems.isNotEmpty()) {
+      trashAutoPurged = true
+      val cutoff = System.currentTimeMillis() - THIRTY_DAYS_MILLIS
+      val expiredIds = walletOps.trashItems.filter { it.deletedAtMillis in 1L until cutoff }.map { it.id }
+      if (expiredIds.isNotEmpty()) {
+        viewModelScope.launch {
+          accountTrashRepository.deleteTrashItemsBatch(currentUserId, expiredIds)
+        }
+      }
+    }
     UiState.Success(
       DashboardUiData(
         expenses = expSnap.items,
         incomes = incSnap.items,
-        transfers = trSnap.items,
-        payables = paySnap.items,
-        payablePayments = pmtSnap.items,
-        receivables = recSnap.items,
-        receivablePayments = recPmtSnap.items,
+        transfers = walletOps.transfers.items,
+        payables = walletOps.payables.items,
+        payablePayments = walletOps.payablePayments.items,
+        receivables = walletOps.receivables.items,
+        receivablePayments = walletOps.receivablePayments.items,
         customCategories = cats,
         budgets = budgets,
         hasPendingWrites = expSnap.hasPendingWrites ||
           incSnap.hasPendingWrites ||
-          trSnap.hasPendingWrites ||
-          paySnap.hasPendingWrites ||
-          pmtSnap.hasPendingWrites ||
-          recSnap.hasPendingWrites ||
-          recPmtSnap.hasPendingWrites,
+          walletOps.transfers.hasPendingWrites ||
+          walletOps.payables.hasPendingWrites ||
+          walletOps.payablePayments.hasPendingWrites ||
+          walletOps.receivables.hasPendingWrites ||
+          walletOps.receivablePayments.hasPendingWrites ||
+          walletOps.accounts.hasPendingWrites,
         isFromCache = expSnap.isFromCache &&
           incSnap.isFromCache &&
-          trSnap.isFromCache &&
-          paySnap.isFromCache &&
-          pmtSnap.isFromCache &&
-          recSnap.isFromCache &&
-          recPmtSnap.isFromCache,
+          walletOps.transfers.isFromCache &&
+          walletOps.payables.isFromCache &&
+          walletOps.payablePayments.isFromCache &&
+          walletOps.receivables.isFromCache &&
+          walletOps.receivablePayments.isFromCache &&
+          walletOps.accounts.isFromCache,
+        customAccounts = walletOps.accounts.items,
+        trashItems = walletOps.trashItems,
       )
     ) as UiState<DashboardUiData>
   }
@@ -299,7 +249,6 @@ class HisabViewModel(
           if (userSettings.pinEnabled && userSettings.pinHash.isNotEmpty()) {
             _isLocked.value = true
           }
-          // Apply cloud sync network toggle on startup
           repository.setCloudSyncEnabled(userSettings.cloudSyncEnabled)
         }
       }
@@ -345,6 +294,16 @@ class HisabViewModel(
 
   fun shiftMonth(delta: Int) {
     _selectedMonthKey.value = DateFormatUtils.shiftMonthKey(_selectedMonthKey.value, delta)
+    _selectedPeriodFilter.value = PeriodFilter.CUSTOM_MONTH
+  }
+
+  fun setPeriodFilter(filter: PeriodFilter) {
+    _selectedPeriodFilter.value = filter
+    when (filter) {
+      PeriodFilter.THIS_MONTH -> _selectedMonthKey.value = DateFormatUtils.currentMonthKey()
+      PeriodFilter.LAST_MONTH -> _selectedMonthKey.value = DateFormatUtils.shiftMonthKey(DateFormatUtils.currentMonthKey(), -1)
+      else -> Unit
+    }
   }
 
   fun setCategoryFilter(categoryId: String?) {
@@ -407,6 +366,79 @@ class HisabViewModel(
     viewModelScope.launch { prefsRepo.setBudgetAlertsEnabled(enabled) }
   }
 
+  fun setShowNotesInList(enabled: Boolean) {
+    viewModelScope.launch { prefsRepo.setShowNotesInList(enabled) }
+  }
+
+  fun setUse24HourTime(enabled: Boolean) {
+    viewModelScope.launch { prefsRepo.setUse24HourTime(enabled) }
+  }
+
+  fun setPageSize(size: Int) {
+    viewModelScope.launch { prefsRepo.setPageSize(size) }
+  }
+
+  fun setBlurBalances(enabled: Boolean) {
+    viewModelScope.launch { prefsRepo.setBlurBalances(enabled) }
+  }
+
+  fun setHapticEnabled(enabled: Boolean) {
+    viewModelScope.launch { prefsRepo.setHapticEnabled(enabled) }
+  }
+
+  fun addAccount(
+    name: String,
+    accountType: PaymentMethod,
+    iconKey: String,
+    colorHex: Long,
+    openingBalance: Double,
+  ) {
+    viewModelScope.launch {
+      accountTrashRepository.addAccount(
+        userId = currentUserId,
+        name = name,
+        accountType = accountType,
+        iconKey = iconKey,
+        colorHex = colorHex,
+        openingBalance = openingBalance,
+        currencyCode = settings.value.currencyCode,
+      ).onFailure { err ->
+        _messages.tryEmit(err.localizedMessage ?: "Failed to create account")
+      }
+    }
+  }
+
+  fun updateAccount(
+    accountId: String,
+    name: String,
+    accountType: PaymentMethod,
+    iconKey: String,
+    colorHex: Long,
+    openingBalance: Double,
+  ) {
+    viewModelScope.launch {
+      accountTrashRepository.updateAccount(
+        userId = currentUserId,
+        accountId = accountId,
+        name = name,
+        accountType = accountType,
+        iconKey = iconKey,
+        colorHex = colorHex,
+        openingBalance = openingBalance,
+        currencyCode = settings.value.currencyCode,
+      ).onFailure { err ->
+        _messages.tryEmit(err.localizedMessage ?: "Failed to update account")
+      }
+    }
+  }
+
+  fun deleteAccount(accountId: String) {
+    viewModelScope.launch {
+      accountTrashRepository.deleteAccount(currentUserId, accountId)
+        .onFailure { err -> _messages.tryEmit(err.localizedMessage ?: "Failed to delete account") }
+    }
+  }
+
   fun addExpense(
     title: String,
     amount: Double,
@@ -414,6 +446,7 @@ class HisabViewModel(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    accountId: String? = null,
   ) {
     viewModelScope.launch {
       val result = repository.addExpense(
@@ -424,6 +457,7 @@ class HisabViewModel(
         paymentMethod = paymentMethod,
         note = note,
         dateMillis = dateMillis,
+        accountId = accountId,
       )
       result.onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to save expense")
@@ -441,6 +475,7 @@ class HisabViewModel(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    accountId: String? = null,
   ) {
     viewModelScope.launch {
       val result = repository.updateExpense(
@@ -452,6 +487,7 @@ class HisabViewModel(
         paymentMethod = paymentMethod,
         note = note,
         dateMillis = dateMillis,
+        accountId = accountId,
       )
       result.onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to update expense")
@@ -460,9 +496,17 @@ class HisabViewModel(
   }
 
   fun deleteExpense(expenseId: String) {
+    val currentData = (dashboardState.value as? UiState.Success)?.data
+    val target = currentData?.expenses?.firstOrNull { it.id == expenseId }
     viewModelScope.launch {
-      val result = repository.deleteExpense(currentUserId, expenseId)
-      result.onFailure { err ->
+      val res = if (target != null) {
+        accountTrashRepository.moveExpenseToTrash(currentUserId, target)
+      } else {
+        repository.deleteExpense(currentUserId, expenseId)
+      }
+      res.onSuccess {
+        if (target != null) _messages.tryEmit(stringsFor(settings.value.language).movedToTrashMessage)
+      }.onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to delete expense")
       }
     }
@@ -474,6 +518,8 @@ class HisabViewModel(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    categoryId: String? = null,
+    accountId: String? = null,
   ) {
     viewModelScope.launch {
       val result = repository.addIncome(
@@ -483,6 +529,8 @@ class HisabViewModel(
         paymentMethod = paymentMethod,
         note = note,
         dateMillis = dateMillis,
+        categoryId = categoryId,
+        accountId = accountId,
       )
       result.onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to save balance")
@@ -497,6 +545,8 @@ class HisabViewModel(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    categoryId: String? = null,
+    accountId: String? = null,
   ) {
     viewModelScope.launch {
       val result = repository.updateIncome(
@@ -507,6 +557,8 @@ class HisabViewModel(
         paymentMethod = paymentMethod,
         note = note,
         dateMillis = dateMillis,
+        categoryId = categoryId,
+        accountId = accountId,
       )
       result.onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to update balance")
@@ -515,9 +567,17 @@ class HisabViewModel(
   }
 
   fun deleteIncome(incomeId: String) {
+    val currentData = (dashboardState.value as? UiState.Success)?.data
+    val target = currentData?.incomes?.firstOrNull { it.id == incomeId }
     viewModelScope.launch {
-      val result = repository.deleteIncome(currentUserId, incomeId)
-      result.onFailure { err ->
+      val res = if (target != null) {
+        accountTrashRepository.moveIncomeToTrash(currentUserId, target)
+      } else {
+        repository.deleteIncome(currentUserId, incomeId)
+      }
+      res.onSuccess {
+        if (target != null) _messages.tryEmit(stringsFor(settings.value.language).movedToTrashMessage)
+      }.onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to delete balance")
       }
     }
@@ -529,6 +589,8 @@ class HisabViewModel(
     amount: Double,
     note: String,
     dateMillis: Long,
+    fromAccountId: String? = null,
+    toAccountId: String? = null,
   ) {
     viewModelScope.launch {
       repository.addTransfer(
@@ -538,6 +600,8 @@ class HisabViewModel(
         amount = amount,
         note = note,
         dateMillis = dateMillis,
+        fromAccountId = fromAccountId,
+        toAccountId = toAccountId,
       ).onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to transfer funds")
       }
@@ -551,6 +615,8 @@ class HisabViewModel(
     amount: Double,
     note: String,
     dateMillis: Long,
+    fromAccountId: String? = null,
+    toAccountId: String? = null,
   ) {
     viewModelScope.launch {
       repository.updateTransfer(
@@ -561,6 +627,8 @@ class HisabViewModel(
         amount = amount,
         note = note,
         dateMillis = dateMillis,
+        fromAccountId = fromAccountId,
+        toAccountId = toAccountId,
       ).onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to update transfer")
       }
@@ -568,8 +636,17 @@ class HisabViewModel(
   }
 
   fun deleteTransfer(transferId: String) {
+    val currentData = (dashboardState.value as? UiState.Success)?.data
+    val target = currentData?.transfers?.firstOrNull { it.id == transferId }
     viewModelScope.launch {
-      repository.deleteTransfer(currentUserId, transferId).onFailure { err ->
+      val res = if (target != null) {
+        accountTrashRepository.moveTransferToTrash(currentUserId, target)
+      } else {
+        repository.deleteTransfer(currentUserId, transferId)
+      }
+      res.onSuccess {
+        if (target != null) _messages.tryEmit(stringsFor(settings.value.language).movedToTrashMessage)
+      }.onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to delete transfer")
       }
     }
@@ -581,6 +658,8 @@ class HisabViewModel(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    dueDateMillis: Long? = null,
+    accountId: String? = null,
   ) {
     viewModelScope.launch {
       repository.addPayable(
@@ -590,6 +669,8 @@ class HisabViewModel(
         paymentMethod = paymentMethod,
         note = note,
         dateMillis = dateMillis,
+        dueDateMillis = dueDateMillis,
+        accountId = accountId,
       ).onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to add borrowed record")
       }
@@ -603,6 +684,8 @@ class HisabViewModel(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    dueDateMillis: Long? = payable.dueDateMillis,
+    accountId: String? = payable.accountId,
   ) {
     viewModelScope.launch {
       repository.updatePayable(
@@ -613,6 +696,8 @@ class HisabViewModel(
         paymentMethod = paymentMethod,
         note = note,
         dateMillis = dateMillis,
+        dueDateMillis = dueDateMillis,
+        accountId = accountId,
       ).onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to update payable")
       }
@@ -621,12 +706,20 @@ class HisabViewModel(
 
   fun deletePayable(payableId: String) {
     val currentData = (dashboardState.value as? UiState.Success)?.data
+    val target = currentData?.payables?.firstOrNull { it.id == payableId }
     val relatedPaymentIds = currentData?.payablePayments
       ?.filter { it.payableId == payableId }
       ?.map { it.id }
       .orEmpty()
     viewModelScope.launch {
-      repository.deletePayable(currentUserId, payableId, relatedPaymentIds).onFailure { err ->
+      val res = if (target != null) {
+        accountTrashRepository.movePayableToTrash(currentUserId, target, relatedPaymentIds)
+      } else {
+        repository.deletePayable(currentUserId, payableId, relatedPaymentIds)
+      }
+      res.onSuccess {
+        if (target != null) _messages.tryEmit(stringsFor(settings.value.language).movedToTrashMessage)
+      }.onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to delete payable")
       }
     }
@@ -638,6 +731,7 @@ class HisabViewModel(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    accountId: String? = null,
   ) {
     val currentData = (dashboardState.value as? UiState.Success)?.data
     val currentPaid = currentData?.paidAmountForPayable(payable) ?: payable.paidAmount
@@ -650,6 +744,7 @@ class HisabViewModel(
         note = note,
         dateMillis = dateMillis,
         currentPaidSum = currentPaid,
+        accountId = accountId,
       ).onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to record repayment")
       }
@@ -681,6 +776,8 @@ class HisabViewModel(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    dueDateMillis: Long? = null,
+    accountId: String? = null,
   ) {
     viewModelScope.launch {
       repository.addReceivable(
@@ -690,6 +787,8 @@ class HisabViewModel(
         paymentMethod = paymentMethod,
         note = note,
         dateMillis = dateMillis,
+        dueDateMillis = dueDateMillis,
+        accountId = accountId,
       ).onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to add lent record")
       }
@@ -703,6 +802,8 @@ class HisabViewModel(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    dueDateMillis: Long? = receivable.dueDateMillis,
+    accountId: String? = receivable.accountId,
   ) {
     viewModelScope.launch {
       repository.updateReceivable(
@@ -713,6 +814,8 @@ class HisabViewModel(
         paymentMethod = paymentMethod,
         note = note,
         dateMillis = dateMillis,
+        dueDateMillis = dueDateMillis,
+        accountId = accountId,
       ).onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to update receivable")
       }
@@ -721,12 +824,20 @@ class HisabViewModel(
 
   fun deleteReceivable(receivableId: String) {
     val currentData = (dashboardState.value as? UiState.Success)?.data
+    val target = currentData?.receivables?.firstOrNull { it.id == receivableId }
     val relatedPaymentIds = currentData?.receivablePayments
       ?.filter { it.receivableId == receivableId }
       ?.map { it.id }
       .orEmpty()
     viewModelScope.launch {
-      repository.deleteReceivable(currentUserId, receivableId, relatedPaymentIds).onFailure { err ->
+      val res = if (target != null) {
+        accountTrashRepository.moveReceivableToTrash(currentUserId, target, relatedPaymentIds)
+      } else {
+        repository.deleteReceivable(currentUserId, receivableId, relatedPaymentIds)
+      }
+      res.onSuccess {
+        if (target != null) _messages.tryEmit(stringsFor(settings.value.language).movedToTrashMessage)
+      }.onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to delete receivable")
       }
     }
@@ -738,6 +849,7 @@ class HisabViewModel(
     paymentMethod: PaymentMethod,
     note: String,
     dateMillis: Long,
+    accountId: String? = null,
   ) {
     val currentData = (dashboardState.value as? UiState.Success)?.data
     val currentCollected = currentData?.collectedAmountForReceivable(receivable) ?: receivable.collectedAmount
@@ -750,6 +862,7 @@ class HisabViewModel(
         note = note,
         dateMillis = dateMillis,
         currentCollectedSum = currentCollected,
+        accountId = accountId,
       ).onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to record collection")
       }
@@ -771,6 +884,78 @@ class HisabViewModel(
         newCollectedSumAfterDelete = newCollectedSum,
       ).onFailure { err ->
         _messages.tryEmit(err.localizedMessage ?: "Failed to delete collection")
+      }
+    }
+  }
+
+  fun bulkSoftDeleteTransactions(items: List<Pair<String, String>>) {
+    val currentData = (dashboardState.value as? UiState.Success)?.data ?: return
+    if (items.isEmpty()) return
+    viewModelScope.launch {
+      var moved = 0
+      for ((entityType, id) in items) {
+        val res = when (entityType) {
+          "EXPENSE" -> currentData.expenses.firstOrNull { it.id == id }?.let {
+            accountTrashRepository.moveExpenseToTrash(currentUserId, it)
+          }
+          "INCOME" -> currentData.incomes.firstOrNull { it.id == id }?.let {
+            accountTrashRepository.moveIncomeToTrash(currentUserId, it)
+          }
+          "TRANSFER" -> currentData.transfers.firstOrNull { it.id == id }?.let {
+            accountTrashRepository.moveTransferToTrash(currentUserId, it)
+          }
+          "PAYABLE" -> currentData.payables.firstOrNull { it.id == id }?.let { pay ->
+            val relIds = currentData.payablePayments.filter { it.payableId == id }.map { it.id }
+            accountTrashRepository.movePayableToTrash(currentUserId, pay, relIds)
+          }
+          "RECEIVABLE" -> currentData.receivables.firstOrNull { it.id == id }?.let { rec ->
+            val relIds = currentData.receivablePayments.filter { it.receivableId == id }.map { it.id }
+            accountTrashRepository.moveReceivableToTrash(currentUserId, rec, relIds)
+          }
+          else -> null
+        }
+        if (res?.isSuccess == true) moved++
+      }
+      if (moved > 0) {
+        _messages.tryEmit(stringsFor(settings.value.language).movedToTrashMessage)
+      }
+    }
+  }
+
+  fun restoreTrashItem(item: TrashItem) {
+    viewModelScope.launch {
+      accountTrashRepository.restoreFromTrash(currentUserId, item)
+        .onSuccess { _messages.tryEmit(stringsFor(settings.value.language).restoredMessage) }
+        .onFailure { _messages.tryEmit(it.localizedMessage ?: "Failed to restore item") }
+    }
+  }
+
+  fun permanentlyDeleteTrashItem(trashId: String) {
+    viewModelScope.launch {
+      accountTrashRepository.deleteTrashItem(currentUserId, trashId)
+        .onFailure { _messages.tryEmit(it.localizedMessage ?: "Failed to delete item") }
+    }
+  }
+
+  fun emptyTrash() {
+    val currentData = (dashboardState.value as? UiState.Success)?.data ?: return
+    val ids = currentData.trashItems.map { it.id }
+    if (ids.isEmpty()) return
+    viewModelScope.launch {
+      accountTrashRepository.deleteTrashItemsBatch(currentUserId, ids)
+        .onFailure { _messages.tryEmit(it.localizedMessage ?: "Failed to empty trash") }
+    }
+  }
+
+  fun clearAllUserData() {
+    viewModelScope.launch {
+      _isBusy.value = true
+      try {
+        accountTrashRepository.clearAllUserData(currentUserId)
+          .onSuccess { _messages.tryEmit(stringsFor(settings.value.language).allDataClearedMessage) }
+          .onFailure { _messages.tryEmit(it.localizedMessage ?: "Failed to clear data") }
+      } finally {
+        _isBusy.value = false
       }
     }
   }
@@ -978,10 +1163,28 @@ class HisabViewModel(
     }
   }
 
-  fun addCustomCategory(name: String, iconKey: String, colorHex: Long) {
+  fun addCustomCategory(
+    name: String,
+    iconKey: String,
+    colorHex: Long,
+    categoryType: CategoryFlowType = CategoryFlowType.EXPENSE,
+  ) {
     viewModelScope.launch {
-      repository.addCustomCategory(currentUserId, name, iconKey, colorHex)
+      repository.addCustomCategory(currentUserId, name, iconKey, colorHex, categoryType)
         .onFailure { _messages.tryEmit(it.localizedMessage ?: "Failed to add category") }
+    }
+  }
+
+  fun updateCustomCategory(
+    categoryId: String,
+    name: String,
+    iconKey: String,
+    colorHex: Long,
+    categoryType: CategoryFlowType,
+  ) {
+    viewModelScope.launch {
+      repository.updateCustomCategory(currentUserId, categoryId, name, iconKey, colorHex, categoryType)
+        .onFailure { _messages.tryEmit(it.localizedMessage ?: "Failed to update category") }
     }
   }
 
@@ -989,6 +1192,14 @@ class HisabViewModel(
     viewModelScope.launch {
       repository.deleteCustomCategory(currentUserId, categoryId)
         .onFailure { _messages.tryEmit(it.localizedMessage ?: "Failed to delete category") }
+    }
+  }
+
+  fun bulkDeleteCustomCategories(categoryIds: List<String>) {
+    if (categoryIds.isEmpty()) return
+    viewModelScope.launch {
+      repository.bulkDeleteCustomCategories(currentUserId, categoryIds)
+        .onFailure { _messages.tryEmit(it.localizedMessage ?: "Failed to delete categories") }
     }
   }
 
@@ -1028,14 +1239,16 @@ class HisabViewModel(
       payablePayments = data?.payablePayments.orEmpty(),
       receivables = data?.receivables.orEmpty(),
       receivablePayments = data?.receivablePayments.orEmpty(),
+      customAccounts = data?.customAccounts.orEmpty(),
     )
   }
 
   fun buildCsvExportString(): String {
     val data = (dashboardState.value as? UiState.Success)?.data
     val strings = stringsFor(settings.value.language)
-    val categories = CategoryCatalog.mergeCategories(strings, data?.customCategories.orEmpty())
+    val categories = CategoryCatalog.mergeCategories(strings, data?.customCategories.orEmpty(), includeIncome = true)
       .associateBy { it.id }
+    val accountsById = data?.customAccounts.orEmpty().associateBy { it.id }
     val symbol = CurrencyOption.fromCode(settings.value.currencyCode).symbol
     return BackupSerializer.toCsvExport(
       expenses = data?.expenses.orEmpty(),
@@ -1049,6 +1262,31 @@ class HisabViewModel(
       payablePayments = data?.payablePayments.orEmpty(),
       receivables = data?.receivables.orEmpty(),
       receivablePayments = data?.receivablePayments.orEmpty(),
+      accountsById = accountsById,
+    )
+  }
+
+  fun buildLedgerCsvString(selectedAccountKey: String?, periodFilter: PeriodFilter, monthKey: String): String {
+    val data = (dashboardState.value as? UiState.Success)?.data ?: return ""
+    val strings = stringsFor(settings.value.language)
+    val (start, end) = DateFormatUtils.periodRangeMillis(periodFilter, monthKey)
+    val result = HisabAnalytics.computeAccountLedger(data, selectedAccountKey, start, end, strings)
+    val symbol = CurrencyOption.fromCode(settings.value.currencyCode).symbol
+    return BackupSerializer.toLedgerCsv(result.toCsvRows(), symbol, settings.value.language.code, strings)
+  }
+
+  fun buildTrialBalanceCsvString(periodFilter: PeriodFilter, monthKey: String): String {
+    val data = (dashboardState.value as? UiState.Success)?.data ?: return ""
+    val strings = stringsFor(settings.value.language)
+    val (start, end) = DateFormatUtils.periodRangeMillis(periodFilter, monthKey)
+    val result = HisabAnalytics.computeTrialBalance(data, start, end, strings, settings.value.currencyCode)
+    val symbol = CurrencyOption.fromCode(settings.value.currencyCode).symbol
+    return BackupSerializer.toTrialBalanceCsv(
+      rows = result.toCsvRows(),
+      totalDebit = result.totalDebit,
+      totalCredit = result.totalCredit,
+      currencySymbol = symbol,
+      strings = strings,
     )
   }
 
@@ -1056,6 +1294,7 @@ class HisabViewModel(
     val currentData = (dashboardState.value as? UiState.Success)?.data
     val existingCatIds = currentData?.customCategories?.map { it.id }?.toSet().orEmpty()
     val existingBudgetIds = currentData?.budgets?.map { it.monthKey }?.toSet().orEmpty()
+    val existingAccountIds = currentData?.customAccounts?.map { it.id }?.toSet().orEmpty()
     viewModelScope.launch {
       _isBusy.value = true
       try {
@@ -1073,6 +1312,8 @@ class HisabViewModel(
           payablePayments = parsed.payablePayments,
           receivables = parsed.receivables,
           receivablePayments = parsed.receivablePayments,
+          customAccounts = parsed.customAccounts,
+          existingAccountIds = existingAccountIds,
         )
         res.onSuccess {
           _messages.tryEmit(stringsFor(settings.value.language).importSuccess)
@@ -1143,6 +1384,8 @@ class HisabViewModel(
             payablePayments = parsed.payablePayments,
             receivables = parsed.receivables,
             receivablePayments = parsed.receivablePayments,
+            customAccounts = parsed.customAccounts,
+            existingAccountIds = currentData?.customAccounts?.map { it.id }?.toSet().orEmpty(),
           )
           res.onSuccess {
             _messages.tryEmit(stringsFor(settings.value.language).driveRestoreSuccess)
@@ -1196,76 +1439,14 @@ class HisabViewModel(
     data: DashboardUiData,
     monthKey: String,
     language: AppLanguage,
-  ): MonthlySummary {
-    val strings = stringsFor(language)
-    val categories = CategoryCatalog.mergeCategories(strings, data.customCategories)
-    val catMap = categories.associateBy { it.id }
+  ): MonthlySummary = HisabAnalytics.computeMonthlySummary(data, monthKey, language)
 
-    val monthExpenses = data.expenses.filter { it.monthKey == monthKey }
-    val monthIncomes = data.incomes.filter { it.monthKey == monthKey }
-    val prevMonthKey = DateFormatUtils.shiftMonthKey(monthKey, -1)
-    val prevExpenses = data.expenses.filter { it.monthKey == prevMonthKey }
-
-    val totalSpent = monthExpenses.sumOf { it.amount }
-    val totalIncome = monthIncomes.sumOf { it.amount }
-    val prevSpent = prevExpenses.sumOf { it.amount }
-
-    val budgetDoc = data.budgets.firstOrNull { it.monthKey == monthKey }
-      ?: data.budgets.firstOrNull { it.monthKey == "default" }
-    val budgetLimit = budgetDoc?.totalLimit ?: 0.0
-    val catLimits = budgetDoc?.categoryLimits.orEmpty()
-
-    val groupedByCat = monthExpenses.groupBy { it.categoryId }
-    val breakdowns = groupedByCat.map { (catId, list) ->
-      val cat = catMap[catId] ?: CategoryItem(catId, catId, "other", 0xFF0891B2)
-      val sum = list.sumOf { it.amount }
-      val pct = if (totalSpent > 0) (sum / totalSpent).toFloat() else 0f
-      CategoryBreakdown(
-        category = cat,
-        totalAmount = sum,
-        percentage = pct,
-        transactionCount = list.size,
-        budgetLimit = catLimits[catId] ?: 0.0,
-      )
-    }.sortedByDescending { it.totalAmount }
-
-    val dailyTotals = mutableMapOf<Int, Double>()
-    val cal = Calendar.getInstance()
-    for (exp in monthExpenses) {
-      cal.timeInMillis = exp.dateMillis
-      val day = cal.get(Calendar.DAY_OF_MONTH)
-      dailyTotals[day] = (dailyTotals[day] ?: 0.0) + exp.amount
-    }
-
-    val daysCount = DateFormatUtils.daysInMonth(monthKey)
-    val activeDays = if (monthKey == DateFormatUtils.currentMonthKey()) {
-      Calendar.getInstance().get(Calendar.DAY_OF_MONTH).coerceAtLeast(1)
-    } else {
-      daysCount
-    }
-    val dailyAvg = if (totalSpent > 0) totalSpent / activeDays else 0.0
-
-    val sixMonthTotals = (-5..0).map { offset ->
-      val mk = DateFormatUtils.shiftMonthKey(monthKey, offset)
-      val sum = data.expenses.filter { it.monthKey == mk }.sumOf { it.amount }
-      DateFormatUtils.formatShortMonthLabel(mk, language.code) to sum
-    }
-
-    return MonthlySummary(
-      monthKey = monthKey,
-      totalSpent = totalSpent,
-      totalIncome = totalIncome,
-      netBalance = totalIncome - totalSpent,
-      prevMonthSpent = prevSpent,
-      transactionCount = monthExpenses.size,
-      dailyAverage = dailyAvg,
-      topCategory = breakdowns.firstOrNull(),
-      budgetLimit = budgetLimit,
-      categoryBreakdowns = breakdowns,
-      dailyTotals = dailyTotals,
-      sixMonthTotals = sixMonthTotals,
-    )
-  }
+  fun computePeriodAnalytics(
+    data: DashboardUiData,
+    filter: PeriodFilter,
+    monthKey: String,
+    language: AppLanguage,
+  ): PeriodAnalyticsSummary = HisabAnalytics.computePeriodAnalytics(data, filter, monthKey, language)
 
   private fun checkCurrentOnline(context: Context): Boolean {
     return try {
@@ -1317,5 +1498,6 @@ class HisabViewModel(
   private companion object {
     const val TAG = "HisabViewModel"
     const val STOP_TIMEOUT_MILLIS = 5000L
+    const val THIRTY_DAYS_MILLIS = 30L * 24 * 60 * 60 * 1000L
   }
 }

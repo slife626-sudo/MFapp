@@ -26,6 +26,10 @@
           "enum": ["CASH", "CARD", "MOBILE", "BANK"],
           "description": "Payment channel used."
         },
+        "accountId": {
+          "type": "string",
+          "description": "Optional CustomAccount document ID."
+        },
         "note": {
           "type": "string",
           "description": "Optional expense note (0-300 chars)."
@@ -64,7 +68,7 @@
     },
     "CustomCategory": {
       "title": "CustomCategory",
-      "description": "A user-defined expense category.",
+      "description": "A user-defined expense or income category.",
       "type": "object",
       "properties": {
         "userId": {
@@ -82,6 +86,11 @@
         "colorHex": {
           "type": "integer",
           "description": "ARGB color integer."
+        },
+        "categoryType": {
+          "type": "string",
+          "enum": ["EXPENSE", "INCOME"],
+          "description": "Optional category flow type (defaults to EXPENSE)."
         },
         "createdAt": {
           "type": "string",
@@ -166,10 +175,18 @@
           "type": "number",
           "description": "Positive balance amount added."
         },
+        "categoryId": {
+          "type": "string",
+          "description": "Optional income category identifier."
+        },
         "paymentMethod": {
           "type": "string",
           "enum": ["CASH", "CARD", "MOBILE", "BANK"],
           "description": "Channel where balance was added."
+        },
+        "accountId": {
+          "type": "string",
+          "description": "Optional CustomAccount document ID."
         },
         "note": {
           "type": "string",
@@ -208,12 +225,14 @@
     },
     "AccountTransfer": {
       "title": "AccountTransfer",
-      "description": "An internal transfer between two user accounts (Cash, Bank, Mobile Banking, Card).",
+      "description": "An internal transfer between two user accounts (Cash, Bank, Mobile Banking, Card, or custom accounts).",
       "type": "object",
       "properties": {
         "userId": { "type": "string", "description": "Firebase Auth UID of the owner." },
-        "fromMethod": { "type": "string", "enum": ["CASH", "CARD", "MOBILE", "BANK"], "description": "Source account." },
-        "toMethod": { "type": "string", "enum": ["CASH", "CARD", "MOBILE", "BANK"], "description": "Destination account." },
+        "fromMethod": { "type": "string", "enum": ["CASH", "CARD", "MOBILE", "BANK"], "description": "Source account channel." },
+        "toMethod": { "type": "string", "enum": ["CASH", "CARD", "MOBILE", "BANK"], "description": "Destination account channel." },
+        "fromAccountId": { "type": "string", "description": "Optional source CustomAccount ID." },
+        "toAccountId": { "type": "string", "description": "Optional destination CustomAccount ID." },
         "amount": { "type": "number", "description": "Positive transfer amount." },
         "note": { "type": "string", "description": "Optional transfer note (0-300 chars)." },
         "dateMillis": { "type": "integer", "description": "Transfer timestamp in epoch milliseconds." },
@@ -233,8 +252,10 @@
         "amount": { "type": "number", "description": "Positive principal borrowed amount." },
         "paidAmount": { "type": "number", "description": "Total amount repaid so far (>= 0)." },
         "paymentMethod": { "type": "string", "enum": ["CASH", "CARD", "MOBILE", "BANK"], "description": "Account that received the borrowed money." },
+        "accountId": { "type": "string", "description": "Optional CustomAccount document ID." },
         "note": { "type": "string", "description": "Optional note (0-300 chars)." },
         "dateMillis": { "type": "integer", "description": "Borrow date/time in epoch milliseconds." },
+        "dueDateMillis": { "type": "integer", "description": "Optional due date in epoch milliseconds." },
         "monthKey": { "type": "string", "description": "Year-month bucket formatted as YYYY-MM." },
         "settled": { "type": "boolean", "description": "Whether the payable has been fully repaid." },
         "createdAt": { "type": "string", "format": "date-time" },
@@ -252,6 +273,7 @@
         "personName": { "type": "string", "description": "Lender name snapshot." },
         "amount": { "type": "number", "description": "Positive repayment amount." },
         "paymentMethod": { "type": "string", "enum": ["CASH", "CARD", "MOBILE", "BANK"], "description": "Account from which repayment was paid." },
+        "accountId": { "type": "string", "description": "Optional CustomAccount document ID." },
         "note": { "type": "string", "description": "Optional note (0-300 chars)." },
         "dateMillis": { "type": "integer", "description": "Repayment date/time in epoch milliseconds." },
         "monthKey": { "type": "string", "description": "Year-month bucket formatted as YYYY-MM." },
@@ -270,8 +292,10 @@
         "amount": { "type": "number", "description": "Positive principal lent amount." },
         "collectedAmount": { "type": "number", "description": "Total amount collected back so far (>= 0)." },
         "paymentMethod": { "type": "string", "enum": ["CASH", "CARD", "MOBILE", "BANK"], "description": "Account from which money was lent." },
+        "accountId": { "type": "string", "description": "Optional CustomAccount document ID." },
         "note": { "type": "string", "description": "Optional note (0-300 chars)." },
         "dateMillis": { "type": "integer", "description": "Lending date/time in epoch milliseconds." },
+        "dueDateMillis": { "type": "integer", "description": "Optional due date in epoch milliseconds." },
         "monthKey": { "type": "string", "description": "Year-month bucket formatted as YYYY-MM." },
         "settled": { "type": "boolean", "description": "Whether the receivable has been fully collected." },
         "createdAt": { "type": "string", "format": "date-time" },
@@ -289,6 +313,7 @@
         "personName": { "type": "string", "description": "Borrower name snapshot." },
         "amount": { "type": "number", "description": "Positive collected amount." },
         "paymentMethod": { "type": "string", "enum": ["CASH", "CARD", "MOBILE", "BANK"], "description": "Account into which collection was received." },
+        "accountId": { "type": "string", "description": "Optional CustomAccount document ID." },
         "note": { "type": "string", "description": "Optional note (0-300 chars)." },
         "dateMillis": { "type": "integer", "description": "Collection date/time in epoch milliseconds." },
         "monthKey": { "type": "string", "description": "Year-month bucket formatted as YYYY-MM." },
@@ -296,6 +321,41 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "receivableId", "personName", "amount", "paymentMethod", "note", "dateMillis", "monthKey", "createdAt", "updatedAt"]
+    },
+    "CustomAccount": {
+      "title": "CustomAccount",
+      "description": "A user-configured wallet or bank/card/mobile account with opening balance, icon, and color.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the owner." },
+        "name": { "type": "string", "description": "Account display name (1-60 chars)." },
+        "accountType": { "type": "string", "enum": ["CASH", "CARD", "MOBILE", "BANK"], "description": "Underlying payment channel type." },
+        "iconKey": { "type": "string", "description": "Icon key identifier (1-32 chars)." },
+        "colorHex": { "type": "integer", "description": "ARGB color integer." },
+        "openingBalance": { "type": "number", "description": "Initial account balance." },
+        "currencyCode": { "type": "string", "description": "ISO currency code (1-8 chars)." },
+        "custom": { "type": "boolean", "description": "Whether created by the user." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "accountType", "iconKey", "colorHex", "openingBalance", "currencyCode", "custom", "createdAt", "updatedAt"]
+    },
+    "TrashItem": {
+      "title": "TrashItem",
+      "description": "A soft-deleted record retained for 30 days in the recycle bin.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the owner." },
+        "entityType": { "type": "string", "enum": ["EXPENSE", "INCOME", "TRANSFER", "PAYABLE", "RECEIVABLE"], "description": "Original record entity type." },
+        "sourceId": { "type": "string", "description": "Original document ID." },
+        "title": { "type": "string", "description": "Display title or person name (1-120 chars)." },
+        "amount": { "type": "number", "description": "Record amount (>= 0)." },
+        "deletedAtMillis": { "type": "integer", "description": "Deletion timestamp in epoch milliseconds." },
+        "payload": { "type": "object", "description": "Serialized primitive fields needed to restore the item." },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "entityType", "sourceId", "title", "amount", "deletedAtMillis", "payload", "createdAt", "updatedAt"]
     },
     "MarketList": {
       "title": "MarketList",
@@ -348,7 +408,7 @@
     },
     "/users/{userId}/transfers/{transferId}": {
       "schema": { "$ref": "#/entities/AccountTransfer" },
-      "description": "User-scoped transfers between Cash, Bank, Mobile Banking, and Card."
+      "description": "User-scoped transfers between Cash, Bank, Mobile Banking, Card, and custom accounts."
     },
     "/users/{userId}/payables/{payableId}": {
       "schema": { "$ref": "#/entities/Payable" },
@@ -368,11 +428,19 @@
     },
     "/users/{userId}/categories/{categoryId}": {
       "schema": { "$ref": "#/entities/CustomCategory" },
-      "description": "User-scoped custom expense categories."
+      "description": "User-scoped custom expense and income categories."
     },
     "/users/{userId}/budgets/{budgetId}": {
       "schema": { "$ref": "#/entities/MonthlyBudget" },
       "description": "User-scoped monthly and default budget limits."
+    },
+    "/users/{userId}/accounts/{accountId}": {
+      "schema": { "$ref": "#/entities/CustomAccount" },
+      "description": "User-scoped custom wallet/bank/card/mobile accounts."
+    },
+    "/users/{userId}/trash/{trashId}": {
+      "schema": { "$ref": "#/entities/TrashItem" },
+      "description": "User-scoped 30-day soft-delete recycle bin items."
     },
     "/marketLists/{listId}": {
       "schema": { "$ref": "#/entities/MarketList" },

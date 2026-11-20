@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Backup
@@ -33,13 +34,18 @@ import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.CloudSync
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.rounded.VerifiedUser
+import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,6 +54,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -61,6 +68,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -69,6 +77,7 @@ import com.example.data.backup.DriveAuthOutcome
 import com.example.data.backup.DriveBackupFile
 import com.example.data.backup.GoogleDriveBackupManager
 import com.example.data.model.CategoryCatalog
+import com.example.data.model.CategoryFlowType
 import com.example.data.model.CurrencyOption
 import com.example.data.model.CustomCategory
 import com.example.data.model.DateFormatUtils
@@ -114,6 +123,16 @@ fun SettingsScreen(
   onAddCustomCategory: (name: String, iconKey: String, colorHex: Long) -> Unit,
   onDeleteCustomCategory: (String) -> Unit,
   onNotifyMessage: (String) -> Unit,
+  trashCount: Int = 0,
+  onOpenTrash: () -> Unit = {},
+  onToggleShowNotes: (Boolean) -> Unit = {},
+  onToggle24HourTime: (Boolean) -> Unit = {},
+  onSelectPageSize: (Int) -> Unit = {},
+  onToggleBlurBalances: (Boolean) -> Unit = {},
+  onToggleHaptic: (Boolean) -> Unit = {},
+  onClearAllData: () -> Unit = {},
+  onAddCustomCategoryEx: ((name: String, iconKey: String, colorHex: Long, flowType: CategoryFlowType) -> Unit)? = null,
+  onUpdateCustomCategory: ((id: String, name: String, iconKey: String, colorHex: Long, flowType: CategoryFlowType) -> Unit)? = null,
   modifier: Modifier = Modifier,
 ) {
   val context = LocalContext.current
@@ -122,11 +141,12 @@ fun SettingsScreen(
 
   var showPinSetupDialog by remember { mutableStateOf(false) }
   var showCustomCatDialog by remember { mutableStateOf(false) }
+  var editingCustomCat by remember { mutableStateOf<CustomCategory?>(null) }
   var showDriveRestoreDialog by remember { mutableStateOf(false) }
+  var confirmClearStep by remember { mutableStateOf(0) } // 0 = closed, 1 = first prompt, 2 = final prompt
   var activeDriveToken by remember { mutableStateOf<String?>(null) }
   var pendingDriveAction by remember { mutableStateOf<PendingDriveAction?>(null) }
 
-  // Google Drive Authorization IntentSender Launcher
   val driveAuthLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.StartIntentSenderForResult(),
   ) { activityResult ->
@@ -135,9 +155,7 @@ fun SettingsScreen(
       activeDriveToken = token
       when (pendingDriveAction) {
         PendingDriveAction.UPLOAD -> onBackupToDrive(token)
-        PendingDriveAction.RESTORE_LIST -> onFetchDriveBackups(token) {
-          showDriveRestoreDialog = true
-        }
+        PendingDriveAction.RESTORE_LIST -> onFetchDriveBackups(token) { showDriveRestoreDialog = true }
         null -> {}
       }
       pendingDriveAction = null
@@ -159,9 +177,7 @@ fun SettingsScreen(
             pendingDriveAction = null
             when (action) {
               PendingDriveAction.UPLOAD -> onBackupToDrive(outcome.accessToken)
-              PendingDriveAction.RESTORE_LIST -> onFetchDriveBackups(outcome.accessToken) {
-                showDriveRestoreDialog = true
-              }
+              PendingDriveAction.RESTORE_LIST -> onFetchDriveBackups(outcome.accessToken) { showDriveRestoreDialog = true }
             }
           }
           is DriveAuthOutcome.NeedsResolution -> {
@@ -181,7 +197,6 @@ fun SettingsScreen(
     }
   }
 
-  // Storage Access Framework (SAF) CSV Export
   val csvExportLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.CreateDocument("text/csv"),
   ) { uri ->
@@ -197,7 +212,6 @@ fun SettingsScreen(
     }
   }
 
-  // SAF JSON Export
   val jsonExportLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.CreateDocument("application/json"),
   ) { uri ->
@@ -213,7 +227,6 @@ fun SettingsScreen(
     }
   }
 
-  // SAF JSON Import
   val jsonImportLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.OpenDocument(),
   ) { uri ->
@@ -235,10 +248,7 @@ fun SettingsScreen(
     verticalArrangement = Arrangement.spacedBy(14.dp),
   ) {
     item {
-      Text(
-        text = strings.settingsTitle,
-        style = MaterialTheme.typography.headlineMedium,
-      )
+      Text(text = strings.settingsTitle, style = MaterialTheme.typography.headlineMedium)
     }
 
     // Account Card
@@ -250,25 +260,102 @@ fun SettingsScreen(
           horizontalArrangement = Arrangement.SpaceBetween,
         ) {
           Column(modifier = Modifier.weight(1f)) {
-            Text(
-              text = userDisplayName.ifBlank { "Google User" },
-              style = MaterialTheme.typography.titleMedium,
-            )
+            Text(userDisplayName.ifBlank { "Google User" }, style = MaterialTheme.typography.titleMedium)
             if (userEmail.isNotBlank()) {
-              Text(
-                text = userEmail,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-              )
+              Text(userEmail, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
           }
-          OutlinedButton(
-            onClick = onSignOut,
-            modifier = Modifier.testTag("sign_out_button"),
-          ) {
+          OutlinedButton(onClick = onSignOut, modifier = Modifier.testTag("sign_out_button")) {
             Icon(Icons.AutoMirrored.Rounded.Logout, contentDescription = strings.signOut, Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
             Text(strings.signOut)
+          }
+        }
+      }
+    }
+
+    // Display & Privacy Preferences
+    item {
+      SettingsCard(title = strings.displayPreferencesSection, icon = Icons.Rounded.Tune) {
+        SettingsSwitchRow(
+          label = strings.showNotesInListLabel,
+          checked = settings.showNotesInList,
+          onCheckedChange = onToggleShowNotes,
+          testTag = "toggle_show_notes",
+        )
+        SettingsSwitchRow(
+          label = strings.use24HourTimeLabel,
+          checked = settings.use24HourTime,
+          onCheckedChange = onToggle24HourTime,
+          testTag = "toggle_24h_time",
+        )
+        SettingsSwitchRow(
+          label = strings.blurBalancesLabel,
+          checked = settings.blurBalances,
+          onCheckedChange = onToggleBlurBalances,
+          testTag = "toggle_blur_balances",
+        )
+        SettingsSwitchRow(
+          label = strings.hapticFeedbackLabel,
+          checked = settings.hapticEnabled,
+          onCheckedChange = onToggleHaptic,
+          testTag = "toggle_haptic",
+        )
+        Spacer(Modifier.height(10.dp))
+        Text(strings.itemsPerPageLabel, style = MaterialTheme.typography.labelLarge)
+        Spacer(Modifier.height(6.dp))
+        FlowRow(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+          listOf(20, 50, 200, 500, 1000, 0).forEach { size ->
+            FilterChip(
+              selected = settings.pageSize == size,
+              onClick = { onSelectPageSize(size) },
+              label = { Text(if (size == 0) strings.allItemsLabel else size.toString()) },
+              modifier = Modifier.testTag("page_size_$size"),
+            )
+          }
+        }
+      }
+    }
+
+    // Trash Quick Card
+    item {
+      Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        shape = RoundedCornerShape(22.dp),
+        modifier = Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(22.dp))
+          .clickable(onClick = onOpenTrash)
+          .testTag("open_trash_button"),
+      ) {
+        Row(
+          modifier = Modifier.fillMaxWidth().padding(18.dp),
+          horizontalArrangement = Arrangement.SpaceBetween,
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Icon(Icons.Rounded.DeleteSweep, contentDescription = strings.navTrash, tint = MaterialTheme.colorScheme.primary)
+            Column {
+              Text(strings.navTrash, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+              Text(strings.trashEmptyBody, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+          }
+          Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (trashCount > 0) {
+              Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = RoundedCornerShape(50)) {
+                Text(
+                  text = trashCount.toString(),
+                  style = MaterialTheme.typography.labelMedium,
+                  fontWeight = FontWeight.Bold,
+                  color = MaterialTheme.colorScheme.onPrimaryContainer,
+                  modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                )
+              }
+            }
+            Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, contentDescription = strings.navTrash)
           }
         }
       }
@@ -284,17 +371,9 @@ fun SettingsScreen(
         ) {
           Column(modifier = Modifier.weight(1f)) {
             Text(strings.cloudSyncToggle, style = MaterialTheme.typography.titleMedium)
-            Text(
-              strings.cloudSyncDesc,
-              style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text(strings.cloudSyncDesc, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
           }
-          Switch(
-            checked = settings.cloudSyncEnabled,
-            onCheckedChange = onToggleCloudSync,
-            modifier = Modifier.testTag("cloud_sync_switch"),
-          )
+          Switch(checked = settings.cloudSyncEnabled, onCheckedChange = onToggleCloudSync, modifier = Modifier.testTag("cloud_sync_switch"))
         }
       }
     }
@@ -303,30 +382,19 @@ fun SettingsScreen(
     item {
       SettingsCard(title = strings.driveBackupSection, icon = Icons.Rounded.Backup) {
         val lastText = if (settings.lastDriveBackupMillis > 0L) {
-          DateFormatUtils.formatDateTime(settings.lastDriveBackupMillis, settings.language.code)
+          DateFormatUtils.formatDateTime(settings.lastDriveBackupMillis, settings.language.code, settings.use24HourTime)
         } else {
           strings.neverBackedUp
         }
-        Text(
-          text = "${strings.lastDriveBackup}: $lastText",
-          style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Text("${strings.lastDriveBackup}: $lastText", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(10.dp))
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
           Button(
             onClick = { startDriveAction(PendingDriveAction.UPLOAD) },
             enabled = !isBusy,
-            modifier = Modifier
-              .weight(1f)
-              .testTag("drive_backup_button"),
+            modifier = Modifier.weight(1f).testTag("drive_backup_button"),
           ) {
-            if (isBusy) {
-              CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-            } else {
+            if (isBusy) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else {
               Icon(Icons.Rounded.Backup, contentDescription = null, Modifier.size(18.dp))
               Spacer(Modifier.width(6.dp))
               Text(strings.backUpToDrive)
@@ -335,9 +403,7 @@ fun SettingsScreen(
           OutlinedButton(
             onClick = { startDriveAction(PendingDriveAction.RESTORE_LIST) },
             enabled = !isBusy,
-            modifier = Modifier
-              .weight(1f)
-              .testTag("drive_restore_button"),
+            modifier = Modifier.weight(1f).testTag("drive_restore_button"),
           ) {
             Icon(Icons.Rounded.CloudDownload, contentDescription = null, Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
@@ -353,31 +419,19 @@ fun SettingsScreen(
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(
             onClick = { csvExportLauncher.launch("hisab_expenses.csv") },
-            modifier = Modifier
-              .fillMaxWidth()
-              .testTag("export_csv_button"),
+            modifier = Modifier.fillMaxWidth().testTag("export_csv_button"),
           ) {
             Icon(Icons.Rounded.Download, contentDescription = null, Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(strings.exportCsv)
           }
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-          ) {
-            OutlinedButton(
-              onClick = { jsonExportLauncher.launch("hisab_backup.json") },
-              modifier = Modifier
-                .weight(1f)
-                .testTag("export_json_button"),
-            ) {
+          Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(onClick = { jsonExportLauncher.launch("hisab_backup.json") }, modifier = Modifier.weight(1f).testTag("export_json_button")) {
               Text(strings.exportJson)
             }
             OutlinedButton(
               onClick = { jsonImportLauncher.launch(arrayOf("application/json", "text/plain")) },
-              modifier = Modifier
-                .weight(1f)
-                .testTag("import_json_button"),
+              modifier = Modifier.weight(1f).testTag("import_json_button"),
             ) {
               Icon(Icons.Rounded.UploadFile, contentDescription = null, Modifier.size(18.dp))
               Spacer(Modifier.width(4.dp))
@@ -398,39 +452,22 @@ fun SettingsScreen(
         ) {
           Column(modifier = Modifier.weight(1f)) {
             Text(strings.pinLockToggle, style = MaterialTheme.typography.titleMedium)
-            Text(
-              strings.pinLockDesc,
-              style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text(strings.pinLockDesc, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
           }
           Switch(
             checked = settings.pinEnabled,
-            onCheckedChange = { checked ->
-              if (checked) showPinSetupDialog = true else onDisablePin()
-            },
+            onCheckedChange = { checked -> if (checked) showPinSetupDialog = true else onDisablePin() },
             modifier = Modifier.testTag("pin_lock_switch"),
           )
         }
-
         if (settings.pinEnabled) {
           Spacer(Modifier.height(8.dp))
-          Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-          ) {
+          Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text(strings.lockOnBackground, style = MaterialTheme.typography.bodyMedium)
-            Switch(
-              checked = settings.lockOnBackground,
-              onCheckedChange = onToggleLockOnBackground,
-            )
+            Switch(checked = settings.lockOnBackground, onCheckedChange = onToggleLockOnBackground)
           }
           Spacer(Modifier.height(6.dp))
-          OutlinedButton(
-            onClick = { showPinSetupDialog = true },
-            modifier = Modifier.fillMaxWidth(),
-          ) {
+          OutlinedButton(onClick = { showPinSetupDialog = true }, modifier = Modifier.fillMaxWidth()) {
             Text(strings.changePin)
           }
         }
@@ -443,12 +480,11 @@ fun SettingsScreen(
         Text(strings.themeModeLabel, style = MaterialTheme.typography.labelLarge)
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          val modes = listOf(
+          listOf(
             ThemeMode.SYSTEM to strings.themeSystem,
             ThemeMode.LIGHT to strings.themeLight,
             ThemeMode.DARK to strings.themeDark,
-          )
-          modes.forEach { (mode, label) ->
+          ).forEach { (mode, label) ->
             FilterChip(
               selected = settings.themeMode == mode,
               onClick = { onSelectThemeMode(mode) },
@@ -457,14 +493,10 @@ fun SettingsScreen(
             )
           }
         }
-
         Spacer(Modifier.height(14.dp))
         Text(strings.themePaletteLabel, style = MaterialTheme.typography.labelLarge)
         Spacer(Modifier.height(8.dp))
-        FlowRow(
-          horizontalArrangement = Arrangement.spacedBy(12.dp),
-          verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
           AppThemePalette.entries.forEach { palette ->
             val swatch = paletteSwatchColor(palette)
             val selected = settings.themePalette == palette
@@ -488,21 +520,10 @@ fun SettingsScreen(
                   .size(42.dp)
                   .clip(CircleShape)
                   .background(swatch)
-                  .border(
-                    width = if (selected) 3.dp else 0.dp,
-                    color = if (selected) MaterialTheme.colorScheme.onSurface else Color.Transparent,
-                    shape = CircleShape,
-                  ),
+                  .border(if (selected) 3.dp else 0.dp, if (selected) MaterialTheme.colorScheme.onSurface else Color.Transparent, CircleShape),
                 contentAlignment = Alignment.Center,
               ) {
-                if (selected) {
-                  Icon(
-                    Icons.Rounded.Check,
-                    contentDescription = label,
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp),
-                  )
-                }
+                if (selected) Icon(Icons.Rounded.Check, contentDescription = label, tint = Color.White, modifier = Modifier.size(20.dp))
               }
               Spacer(Modifier.height(4.dp))
               Text(label, style = MaterialTheme.typography.labelSmall)
@@ -527,14 +548,10 @@ fun SettingsScreen(
             )
           }
         }
-
         Spacer(Modifier.height(12.dp))
         Text(strings.currencyLabel, style = MaterialTheme.typography.labelLarge)
         Spacer(Modifier.height(6.dp))
-        FlowRow(
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
-          verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
           CurrencyOption.entries.forEach { option ->
             FilterChip(
               selected = settings.currencyCode == option.code,
@@ -550,41 +567,37 @@ fun SettingsScreen(
     item {
       SettingsCard(title = strings.customCategoriesSection) {
         customCategories.forEach { cat ->
+          val flowType = CategoryFlowType.fromWire(cat.categoryType)
           Row(
-            modifier = Modifier
-              .fillMaxWidth()
-              .padding(vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
           ) {
             Box(
-              modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(Color(cat.colorHex).copy(alpha = 0.16f)),
+              modifier = Modifier.size(32.dp).clip(CircleShape).background(Color(cat.colorHex).copy(alpha = 0.16f)),
               contentAlignment = Alignment.Center,
             ) {
-              Icon(
-                imageVector = CategoryCatalog.iconFor(cat.iconKey),
-                contentDescription = cat.name,
-                tint = Color(cat.colorHex),
-                modifier = Modifier.size(18.dp),
-              )
+              Icon(CategoryCatalog.iconFor(cat.iconKey), contentDescription = cat.name, tint = Color(cat.colorHex), modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.width(10.dp))
-            Text(
-              text = cat.name,
-              style = MaterialTheme.typography.bodyLarge,
-              modifier = Modifier.weight(1f),
-            )
+            Column(modifier = Modifier.weight(1f)) {
+              Text(cat.name, style = MaterialTheme.typography.bodyLarge)
+              Text(
+                text = if (flowType == CategoryFlowType.INCOME) strings.incomeCategoryType else strings.expenseCategoryType,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+            }
+            if (onUpdateCustomCategory != null) {
+              IconButton(onClick = { editingCustomCat = cat }) {
+                Icon(Icons.Rounded.Edit, contentDescription = strings.editExpense)
+              }
+            }
             IconButton(onClick = { onDeleteCustomCategory(cat.id) }) {
               Icon(Icons.Rounded.DeleteOutline, contentDescription = strings.delete)
             }
           }
         }
-        OutlinedButton(
-          onClick = { showCustomCatDialog = true },
-          modifier = Modifier.fillMaxWidth(),
-        ) {
+        OutlinedButton(onClick = { showCustomCatDialog = true }, modifier = Modifier.fillMaxWidth()) {
           Icon(Icons.Rounded.Add, contentDescription = null, Modifier.size(18.dp))
           Spacer(Modifier.width(6.dp))
           Text(strings.addCustomCategory)
@@ -592,30 +605,33 @@ fun SettingsScreen(
       }
     }
 
+    // Danger Zone (Clear All Data)
+    item {
+      SettingsCard(title = strings.dangerZoneSection, icon = Icons.Rounded.WarningAmber) {
+        OutlinedButton(
+          onClick = { confirmClearStep = 1 },
+          enabled = !isBusy,
+          colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+          modifier = Modifier.fillMaxWidth().height(48.dp).testTag("clear_all_data_button"),
+        ) {
+          Icon(Icons.Rounded.DeleteOutline, contentDescription = strings.clearAllDataButton, modifier = Modifier.size(18.dp))
+          Spacer(Modifier.width(8.dp))
+          Text(strings.clearAllDataButton)
+        }
+      }
+    }
+
     // Ad-Free Notice
     item {
       Card(
-        colors = CardDefaults.cardColors(
-          containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)),
         shape = RoundedCornerShape(18.dp),
         modifier = Modifier.fillMaxWidth(),
       ) {
-        Row(
-          modifier = Modifier.padding(16.dp),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Icon(
-            imageVector = Icons.Rounded.VerifiedUser,
-            contentDescription = strings.adFreeBadge,
-            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-          )
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+          Icon(Icons.Rounded.VerifiedUser, contentDescription = strings.adFreeBadge, tint = MaterialTheme.colorScheme.onPrimaryContainer)
           Spacer(Modifier.width(12.dp))
-          Text(
-            text = strings.adFreeNotice,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-          )
+          Text(strings.adFreeNotice, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
         }
       }
     }
@@ -624,20 +640,75 @@ fun SettingsScreen(
   if (showPinSetupDialog) {
     SetupPinDialog(
       onDismiss = { showPinSetupDialog = false },
-      onPinConfirmed = { newPin ->
-        onEnablePin(newPin)
-        showPinSetupDialog = false
-      },
+      onPinConfirmed = { newPin -> onEnablePin(newPin); showPinSetupDialog = false },
     )
   }
 
   if (showCustomCatDialog) {
     AddCustomCategoryDialog(
+      langCode = settings.language.code,
       onDismiss = { showCustomCatDialog = false },
       onConfirm = { name, iconKey, colorHex ->
         onAddCustomCategory(name, iconKey, colorHex)
         showCustomCatDialog = false
       },
+      onConfirmWithType = onAddCustomCategoryEx?.let { fn ->
+        { name, iconKey, colorHex, flowType ->
+          fn(name, iconKey, colorHex, flowType)
+          showCustomCatDialog = false
+        }
+      },
+    )
+  }
+
+  editingCustomCat?.let { cat ->
+    val updater = onUpdateCustomCategory
+    if (updater != null) {
+      AddCustomCategoryDialog(
+        initialName = cat.name,
+        initialIconKey = cat.iconKey,
+        initialColorHex = cat.colorHex,
+        initialFlowType = CategoryFlowType.fromWire(cat.categoryType),
+        langCode = settings.language.code,
+        isEditing = true,
+        onDismiss = { editingCustomCat = null },
+        onConfirmWithType = { name, iconKey, colorHex, flowType ->
+          updater(cat.id, name, iconKey, colorHex, flowType)
+          editingCustomCat = null
+        },
+      )
+    }
+  }
+
+  if (confirmClearStep == 1) {
+    AlertDialog(
+      onDismissRequest = { confirmClearStep = 0 },
+      title = { Text(strings.confirmClearAllTitle) },
+      text = { Text(strings.confirmClearAllMessage) },
+      confirmButton = {
+        TextButton(
+          onClick = { confirmClearStep = 2 },
+          colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+          modifier = Modifier.testTag("confirm_clear_step1_btn"),
+        ) { Text(strings.clearAllDataButton) }
+      },
+      dismissButton = { TextButton(onClick = { confirmClearStep = 0 }) { Text(strings.cancel) } },
+    )
+  }
+
+  if (confirmClearStep == 2) {
+    AlertDialog(
+      onDismissRequest = { confirmClearStep = 0 },
+      title = { Text(strings.dangerZoneSection) },
+      text = { Text(strings.confirmClearAllMessage) },
+      confirmButton = {
+        TextButton(
+          onClick = { confirmClearStep = 0; onClearAllData() },
+          colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+          modifier = Modifier.testTag("confirm_clear_step2_btn"),
+        ) { Text(strings.deleteForeverButton) }
+      },
+      dismissButton = { TextButton(onClick = { confirmClearStep = 0 }) { Text(strings.cancel) } },
     )
   }
 
@@ -652,24 +723,16 @@ fun SettingsScreen(
           Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             driveFiles.forEach { file ->
               Card(
-                colors = CardDefaults.cardColors(
-                  containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                ),
-                modifier = Modifier
-                  .fillMaxWidth()
-                  .clip(RoundedCornerShape(12.dp))
-                  .clickable {
-                    val token = activeDriveToken
-                    if (token != null) {
-                      onRestoreDriveFile(token, file.id)
-                    }
-                    showDriveRestoreDialog = false
-                  },
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable {
+                  activeDriveToken?.let { token -> onRestoreDriveFile(token, file.id) }
+                  showDriveRestoreDialog = false
+                },
               ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                   Text(file.name, style = MaterialTheme.typography.titleMedium)
                   Text(
-                    text = "${file.modifiedTime.take(10)} • ${(file.sizeBytes / 1024).coerceAtLeast(1)} KB",
+                    "${file.modifiedTime.take(10)} • ${(file.sizeBytes / 1024).coerceAtLeast(1)} KB",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                   )
@@ -680,44 +743,46 @@ fun SettingsScreen(
         }
       },
       confirmButton = {},
-      dismissButton = {
-        TextButton(onClick = { showDriveRestoreDialog = false }) {
-          Text(strings.cancel)
-        }
-      },
+      dismissButton = { TextButton(onClick = { showDriveRestoreDialog = false }) { Text(strings.cancel) } },
     )
+  }
+}
+
+@Composable
+private fun SettingsSwitchRow(
+  label: String,
+  checked: Boolean,
+  onCheckedChange: (Boolean) -> Unit,
+  testTag: String,
+) {
+  Row(
+    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+    horizontalArrangement = Arrangement.SpaceBetween,
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f).padding(end = 8.dp))
+    Switch(checked = checked, onCheckedChange = onCheckedChange, modifier = Modifier.testTag(testTag))
   }
 }
 
 @Composable
 private fun SettingsCard(
   title: String,
-  icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+  icon: ImageVector? = null,
   content: @Composable () -> Unit,
 ) {
   Card(
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-    ),
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
     shape = RoundedCornerShape(22.dp),
     modifier = Modifier.fillMaxWidth(),
   ) {
     Column(modifier = Modifier.padding(18.dp)) {
       Row(verticalAlignment = Alignment.CenterVertically) {
         if (icon != null) {
-          Icon(
-            imageVector = icon,
-            contentDescription = title,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp),
-          )
+          Icon(imageVector = icon, contentDescription = title, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
           Spacer(Modifier.width(8.dp))
         }
-        Text(
-          text = title,
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.SemiBold,
-        )
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
       }
       Spacer(Modifier.height(12.dp))
       content()

@@ -621,3 +621,191 @@ test("Email-shared MarketList & items: owner creates and shares with spouse emai
   await assertSucceeds(listRef.delete());
 });
 
+test("Custom accounts, cross-account transfers, optional fields, and 30-day trash recycle bin", async () => {
+  const aliceDb = testEnv.authenticatedContext(ALICE_UID).firestore();
+  const bobDb = testEnv.authenticatedContext(BOB_UID).firestore();
+  const unauthDb = testEnv.unauthenticatedContext().firestore();
+  const created = new Date(Date.now() - 10000);
+
+  await assertFails(unauthDb.collection("users").doc(ALICE_UID).collection("accounts").get());
+  await assertFails(unauthDb.collection("users").doc(ALICE_UID).collection("trash").get());
+
+  // Create two custom BANK accounts
+  const acctARef = aliceDb.collection("users").doc(ALICE_UID).collection("accounts").doc("acct_dbbl");
+  const acctBRef = aliceDb.collection("users").doc(ALICE_UID).collection("accounts").doc("acct_city");
+  await assertSucceeds(
+    acctARef.set({
+      userId: ALICE_UID,
+      name: "DBBL Savings",
+      accountType: "BANK",
+      iconKey: "bank",
+      colorHex: 0xFF2563EB,
+      openingBalance: 10000,
+      currencyCode: "BDT",
+      custom: true,
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+  await assertSucceeds(
+    acctBRef.set({
+      userId: ALICE_UID,
+      name: "City Bank",
+      accountType: "BANK",
+      iconKey: "bank",
+      colorHex: 0xFF0E7C5B,
+      openingBalance: 5000,
+      currencyCode: "BDT",
+      custom: true,
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+
+  // Update custom account
+  await assertSucceeds(
+    acctARef.update({
+      name: "DBBL Salary",
+      openingBalance: 12000,
+      updatedAt: new Date(Date.now() - 1000),
+    })
+  );
+
+  // Expense & Income with optional accountId & categoryId
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).collection("expenses").doc("exp_acct").set({
+      userId: ALICE_UID,
+      title: "Grocery",
+      amount: 550,
+      categoryId: "groceries",
+      paymentMethod: "BANK",
+      accountId: "acct_dbbl",
+      note: "",
+      dateMillis: Date.now() - 5000,
+      monthKey: "2026-11",
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).collection("incomes").doc("inc_acct").set({
+      userId: ALICE_UID,
+      title: "Monthly Salary",
+      amount: 35000,
+      categoryId: "inc_salary",
+      paymentMethod: "BANK",
+      accountId: "acct_dbbl",
+      note: "Credited",
+      dateMillis: Date.now() - 5000,
+      monthKey: "2026-11",
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+
+  // Cross-account transfer between two different custom BANK accounts succeeds
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).collection("transfers").doc("tr_custom").set({
+      userId: ALICE_UID,
+      fromMethod: "BANK",
+      toMethod: "BANK",
+      fromAccountId: "acct_dbbl",
+      toAccountId: "acct_city",
+      amount: 2000,
+      note: "Rebalance bank",
+      dateMillis: Date.now() - 4000,
+      monthKey: "2026-11",
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+
+  // Same account transfer without distinct accountIds is denied
+  await assertFails(
+    aliceDb.collection("users").doc(ALICE_UID).collection("transfers").doc("tr_same_acct").set({
+      userId: ALICE_UID,
+      fromMethod: "BANK",
+      toMethod: "BANK",
+      fromAccountId: "acct_dbbl",
+      toAccountId: "acct_dbbl",
+      amount: 500,
+      note: "",
+      dateMillis: Date.now() - 4000,
+      monthKey: "2026-11",
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+
+  // Payable & Receivable with optional dueDateMillis and accountId, plus CustomCategory with categoryType
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).collection("payables").doc("pay_due").set({
+      userId: ALICE_UID,
+      personName: "Hasan",
+      amount: 4000,
+      paidAmount: 0,
+      paymentMethod: "BANK",
+      accountId: "acct_dbbl",
+      note: "",
+      dateMillis: Date.now() - 5000,
+      dueDateMillis: Date.now() + 86400000,
+      monthKey: "2026-11",
+      settled: false,
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+  await assertSucceeds(
+    aliceDb.collection("users").doc(ALICE_UID).collection("categories").doc("cat_inc").set({
+      userId: ALICE_UID,
+      name: "Bonus",
+      iconKey: "trophy",
+      colorHex: 0xFFD97706,
+      categoryType: "INCOME",
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+
+  // Trash create & delete succeed; update denied
+  const trashRef = aliceDb.collection("users").doc(ALICE_UID).collection("trash").doc("tr_1");
+  await assertSucceeds(
+    trashRef.set({
+      userId: ALICE_UID,
+      entityType: "EXPENSE",
+      sourceId: "exp_acct",
+      title: "Grocery",
+      amount: 550,
+      deletedAtMillis: Date.now(),
+      payload: {
+        title: "Grocery",
+        amount: 550,
+        categoryId: "groceries",
+        paymentMethod: "BANK",
+        accountId: "acct_dbbl",
+        note: "",
+        dateMillis: Date.now() - 5000,
+        monthKey: "2026-11",
+      },
+      createdAt: created,
+      updatedAt: created,
+    })
+  );
+  await assertFails(
+    trashRef.update({
+      title: "Modified",
+      updatedAt: new Date(Date.now() - 1000),
+    })
+  );
+
+  // Cross-user isolation on accounts and trash
+  await assertFails(bobDb.collection("users").doc(ALICE_UID).collection("accounts").get());
+  await assertFails(bobDb.collection("users").doc(ALICE_UID).collection("trash").get());
+  await assertFails(bobDb.collection("users").doc(ALICE_UID).collection("trash").doc("tr_1").delete());
+
+  // Owner deletes trash item & accounts
+  await assertSucceeds(trashRef.delete());
+  await assertSucceeds(acctARef.delete());
+  await assertSucceeds(acctBRef.delete());
+});
+

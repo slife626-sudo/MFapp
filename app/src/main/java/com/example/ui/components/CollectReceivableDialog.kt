@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.example.data.model.AccountSummary
 import com.example.data.model.CurrencyFormat
 import com.example.data.model.DateFormatUtils
 import com.example.data.model.PaymentMethod
@@ -46,6 +47,7 @@ import com.example.data.model.Receivable
 import com.example.i18n.LocalStrings
 import com.example.ui.theme.HisabMonoFontFamily
 import com.example.viewmodel.AccountBalances
+import com.example.viewmodel.DashboardUiData
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -56,7 +58,9 @@ fun CollectReceivableDialog(
   currencySymbol: String,
   langCode: String,
   onDismiss: () -> Unit,
-  onConfirm: (amount: Double, paymentMethod: PaymentMethod, note: String, dateMillis: Long) -> Unit,
+  onConfirm: (amount: Double, paymentMethod: PaymentMethod, note: String, dateMillis: Long) -> Unit = { _, _, _, _ -> },
+  accountSummaries: List<AccountSummary> = emptyList(),
+  onConfirmWithAccount: ((amount: Double, paymentMethod: PaymentMethod, note: String, dateMillis: Long, accountId: String?) -> Unit)? = null,
 ) {
   val strings = LocalStrings.current
   val remainingDue = (receivable.amount - collectedAlready).coerceAtLeast(0.0)
@@ -69,6 +73,11 @@ fun CollectReceivableDialog(
   }
   var selectedMethod by remember(receivable.id) {
     mutableStateOf(PaymentMethod.fromWire(receivable.paymentMethod))
+  }
+  var selectedAccountKey by remember(receivable.id, accountSummaries) {
+    val initialKey = receivable.accountId?.takeIf { id -> accountSummaries.any { it.accountId == id } }
+      ?: (DashboardUiData.DEFAULT_ACCOUNT_PREFIX + PaymentMethod.fromWire(receivable.paymentMethod).wireValue)
+    mutableStateOf(initialKey)
   }
   var note by remember { mutableStateOf("") }
   var dateMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -128,22 +137,34 @@ fun CollectReceivableDialog(
           style = MaterialTheme.typography.labelLarge,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        FlowRow(
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          PaymentMethod.entries.forEach { method ->
-            val methodLabel = when (method) {
-              PaymentMethod.CASH -> strings.cash
-              PaymentMethod.CARD -> strings.card
-              PaymentMethod.MOBILE -> strings.mobileBanking
-              PaymentMethod.BANK -> strings.bank
+        if (accountSummaries.isNotEmpty()) {
+          AccountSelectorChips(
+            summaries = accountSummaries,
+            selectedKey = selectedAccountKey,
+            currencySymbol = currencySymbol,
+            onSelect = { acct ->
+              selectedAccountKey = acct.accountId
+              selectedMethod = acct.method
+            },
+          )
+        } else {
+          FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+          ) {
+            PaymentMethod.entries.forEach { method ->
+              val methodLabel = when (method) {
+                PaymentMethod.CASH -> strings.cash
+                PaymentMethod.CARD -> strings.card
+                PaymentMethod.MOBILE -> strings.mobileBanking
+                PaymentMethod.BANK -> strings.bank
+              }
+              val bal = accountBalances.forMethod(method)
+              FilterChip(
+                selected = selectedMethod == method,
+                onClick = { selectedMethod = method },
+                label = { Text("$methodLabel (${CurrencyFormat.format(bal, currencySymbol)})") },
+              )
             }
-            val bal = accountBalances.forMethod(method)
-            FilterChip(
-              selected = selectedMethod == method,
-              onClick = { selectedMethod = method },
-              label = { Text("$methodLabel (${CurrencyFormat.format(bal, currencySymbol)})") },
-            )
           }
         }
 
@@ -182,7 +203,12 @@ fun CollectReceivableDialog(
             validationError = strings.invalidInputError
             return@Button
           }
-          onConfirm(amount, selectedMethod, note.trim(), dateMillis)
+          val customAcctId = accountSummaries.firstOrNull { it.accountId == selectedAccountKey && it.isCustom }?.accountId
+          if (onConfirmWithAccount != null) {
+            onConfirmWithAccount(amount, selectedMethod, note.trim(), dateMillis, customAcctId)
+          } else {
+            onConfirm(amount, selectedMethod, note.trim(), dateMillis)
+          }
         },
         modifier = Modifier.testTag("confirm_collect_button"),
       ) {

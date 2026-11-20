@@ -1,7 +1,9 @@
 package com.example.data.backup
 
 import com.example.data.model.AccountTransfer
+import com.example.data.model.CategoryFlowType
 import com.example.data.model.CategoryItem
+import com.example.data.model.CustomAccount
 import com.example.data.model.CustomCategory
 import com.example.data.model.DateFormatUtils
 import com.example.data.model.Expense
@@ -26,6 +28,24 @@ data class BackupPayload(
   val payablePayments: List<PayablePayment> = emptyList(),
   val receivables: List<Receivable> = emptyList(),
   val receivablePayments: List<ReceivablePayment> = emptyList(),
+  val customAccounts: List<CustomAccount> = emptyList(),
+)
+
+data class LedgerCsvRow(
+  val dateMillis: Long,
+  val particulars: String,
+  val accountName: String,
+  val categoryOrType: String,
+  val receiptAmount: Double,
+  val paymentAmount: Double,
+  val runningBalance: Double,
+)
+
+data class TrialBalanceCsvRow(
+  val groupName: String,
+  val accountHead: String,
+  val debitAmount: Double,
+  val creditAmount: Double,
 )
 
 object BackupSerializer {
@@ -40,11 +60,29 @@ object BackupSerializer {
     payablePayments: List<PayablePayment> = emptyList(),
     receivables: List<Receivable> = emptyList(),
     receivablePayments: List<ReceivablePayment> = emptyList(),
+    customAccounts: List<CustomAccount> = emptyList(),
   ): String {
     val root = JSONObject().apply {
       put("app", "Hisab")
-      put("version", 4)
+      put("version", 5)
       put("exportedAtMillis", System.currentTimeMillis())
+
+      val acctArr = JSONArray()
+      for (acct in customAccounts) {
+        acctArr.put(
+          JSONObject().apply {
+            put("id", acct.id)
+            put("name", acct.name)
+            put("accountType", acct.accountType)
+            put("iconKey", acct.iconKey)
+            put("colorHex", acct.colorHex)
+            put("openingBalance", acct.openingBalance)
+            put("currencyCode", acct.currencyCode)
+            put("custom", acct.custom)
+          }
+        )
+      }
+      put("customAccounts", acctArr)
 
       val expArr = JSONArray()
       for (e in expenses) {
@@ -55,6 +93,7 @@ object BackupSerializer {
             put("amount", e.amount)
             put("categoryId", e.categoryId)
             put("paymentMethod", e.paymentMethod)
+            e.accountId?.let { put("accountId", it) }
             put("note", e.note)
             put("dateMillis", e.dateMillis)
             put("monthKey", e.monthKey)
@@ -70,7 +109,9 @@ object BackupSerializer {
             put("id", inc.id)
             put("title", inc.title)
             put("amount", inc.amount)
+            inc.categoryId?.let { put("categoryId", it) }
             put("paymentMethod", inc.paymentMethod)
+            inc.accountId?.let { put("accountId", it) }
             put("note", inc.note)
             put("dateMillis", inc.dateMillis)
             put("monthKey", inc.monthKey)
@@ -86,6 +127,8 @@ object BackupSerializer {
             put("id", tr.id)
             put("fromMethod", tr.fromMethod)
             put("toMethod", tr.toMethod)
+            tr.fromAccountId?.let { put("fromAccountId", it) }
+            tr.toAccountId?.let { put("toAccountId", it) }
             put("amount", tr.amount)
             put("note", tr.note)
             put("dateMillis", tr.dateMillis)
@@ -104,8 +147,10 @@ object BackupSerializer {
             put("amount", pay.amount)
             put("paidAmount", pay.paidAmount)
             put("paymentMethod", pay.paymentMethod)
+            pay.accountId?.let { put("accountId", it) }
             put("note", pay.note)
             put("dateMillis", pay.dateMillis)
+            pay.dueDateMillis?.let { put("dueDateMillis", it) }
             put("monthKey", pay.monthKey)
             put("settled", pay.settled)
           }
@@ -122,6 +167,7 @@ object BackupSerializer {
             put("personName", pmt.personName)
             put("amount", pmt.amount)
             put("paymentMethod", pmt.paymentMethod)
+            pmt.accountId?.let { put("accountId", it) }
             put("note", pmt.note)
             put("dateMillis", pmt.dateMillis)
             put("monthKey", pmt.monthKey)
@@ -139,8 +185,10 @@ object BackupSerializer {
             put("amount", rec.amount)
             put("collectedAmount", rec.collectedAmount)
             put("paymentMethod", rec.paymentMethod)
+            rec.accountId?.let { put("accountId", it) }
             put("note", rec.note)
             put("dateMillis", rec.dateMillis)
+            rec.dueDateMillis?.let { put("dueDateMillis", it) }
             put("monthKey", rec.monthKey)
             put("settled", rec.settled)
           }
@@ -157,6 +205,7 @@ object BackupSerializer {
             put("personName", pmt.personName)
             put("amount", pmt.amount)
             put("paymentMethod", pmt.paymentMethod)
+            pmt.accountId?.let { put("accountId", it) }
             put("note", pmt.note)
             put("dateMillis", pmt.dateMillis)
             put("monthKey", pmt.monthKey)
@@ -173,6 +222,7 @@ object BackupSerializer {
             put("name", c.name)
             put("iconKey", c.iconKey)
             put("colorHex", c.colorHex)
+            put("categoryType", c.categoryType)
           }
         )
       }
@@ -200,6 +250,28 @@ object BackupSerializer {
 
   fun parseJsonBackup(jsonText: String): BackupPayload {
     val root = JSONObject(jsonText)
+
+    val acctArr = root.optJSONArray("customAccounts") ?: JSONArray()
+    val customAccounts = buildList {
+      for (i in 0 until acctArr.length()) {
+        val obj = acctArr.optJSONObject(i) ?: continue
+        val name = obj.optString("name", "").trim()
+        if (name.isEmpty()) continue
+        add(
+          CustomAccount(
+            id = obj.optString("id", ""),
+            name = name,
+            accountType = PaymentMethod.fromWire(obj.optString("accountType")).wireValue,
+            iconKey = obj.optString("iconKey", "wallet"),
+            colorHex = obj.optLong("colorHex", 0xFF2563EB),
+            openingBalance = obj.optDouble("openingBalance", 0.0).takeIf { !it.isNaN() } ?: 0.0,
+            currencyCode = obj.optString("currencyCode", "BDT").ifBlank { "BDT" },
+            custom = obj.optBoolean("custom", true),
+          )
+        )
+      }
+    }
+
     val expArr = root.optJSONArray("expenses") ?: JSONArray()
     val expenses = buildList {
       for (i in 0 until expArr.length()) {
@@ -218,6 +290,7 @@ object BackupSerializer {
             amount = amount,
             categoryId = obj.optString("categoryId", "other").ifBlank { "other" },
             paymentMethod = PaymentMethod.fromWire(obj.optString("paymentMethod")).wireValue,
+            accountId = obj.optString("accountId", "").ifBlank { null },
             note = obj.optString("note", ""),
             dateMillis = dateMillis,
             monthKey = monthKey,
@@ -242,7 +315,9 @@ object BackupSerializer {
             id = obj.optString("id", ""),
             title = title,
             amount = amount,
+            categoryId = obj.optString("categoryId", "").ifBlank { null },
             paymentMethod = PaymentMethod.fromWire(obj.optString("paymentMethod")).wireValue,
+            accountId = obj.optString("accountId", "").ifBlank { null },
             note = obj.optString("note", ""),
             dateMillis = dateMillis,
             monthKey = monthKey,
@@ -257,8 +332,11 @@ object BackupSerializer {
         val obj = trArr.optJSONObject(i) ?: continue
         val fromM = PaymentMethod.fromWire(obj.optString("fromMethod"))
         val toM = PaymentMethod.fromWire(obj.optString("toMethod"))
+        val fromAcc = obj.optString("fromAccountId", "").ifBlank { null }
+        val toAcc = obj.optString("toAccountId", "").ifBlank { null }
         val amount = obj.optDouble("amount", 0.0)
-        if (fromM == toM || amount <= 0.0 || amount.isNaN()) continue
+        val distinctAccs = fromAcc != null && toAcc != null && fromAcc != toAcc
+        if ((fromM == toM && !distinctAccs) || amount <= 0.0 || amount.isNaN()) continue
         val dateMillis = obj.optLong("dateMillis", System.currentTimeMillis())
         val monthKey = obj.optString("monthKey", "").ifBlank {
           DateFormatUtils.monthKeyFromMillis(dateMillis)
@@ -268,6 +346,8 @@ object BackupSerializer {
             id = obj.optString("id", ""),
             fromMethod = fromM.wireValue,
             toMethod = toM.wireValue,
+            fromAccountId = fromAcc,
+            toAccountId = toAcc,
             amount = amount,
             note = obj.optString("note", ""),
             dateMillis = dateMillis,
@@ -288,6 +368,7 @@ object BackupSerializer {
         val monthKey = obj.optString("monthKey", "").ifBlank {
           DateFormatUtils.monthKeyFromMillis(dateMillis)
         }
+        val due = obj.optLong("dueDateMillis", 0L).takeIf { it > 0L }
         add(
           Payable(
             id = obj.optString("id", ""),
@@ -295,8 +376,10 @@ object BackupSerializer {
             amount = amount,
             paidAmount = obj.optDouble("paidAmount", 0.0).coerceAtLeast(0.0),
             paymentMethod = PaymentMethod.fromWire(obj.optString("paymentMethod")).wireValue,
+            accountId = obj.optString("accountId", "").ifBlank { null },
             note = obj.optString("note", ""),
             dateMillis = dateMillis,
+            dueDateMillis = due,
             monthKey = monthKey,
             settled = obj.optBoolean("settled", false),
           )
@@ -323,6 +406,7 @@ object BackupSerializer {
             personName = personName,
             amount = amount,
             paymentMethod = PaymentMethod.fromWire(obj.optString("paymentMethod")).wireValue,
+            accountId = obj.optString("accountId", "").ifBlank { null },
             note = obj.optString("note", ""),
             dateMillis = dateMillis,
             monthKey = monthKey,
@@ -342,6 +426,7 @@ object BackupSerializer {
         val monthKey = obj.optString("monthKey", "").ifBlank {
           DateFormatUtils.monthKeyFromMillis(dateMillis)
         }
+        val due = obj.optLong("dueDateMillis", 0L).takeIf { it > 0L }
         add(
           Receivable(
             id = obj.optString("id", ""),
@@ -349,8 +434,10 @@ object BackupSerializer {
             amount = amount,
             collectedAmount = obj.optDouble("collectedAmount", 0.0).coerceAtLeast(0.0),
             paymentMethod = PaymentMethod.fromWire(obj.optString("paymentMethod")).wireValue,
+            accountId = obj.optString("accountId", "").ifBlank { null },
             note = obj.optString("note", ""),
             dateMillis = dateMillis,
+            dueDateMillis = due,
             monthKey = monthKey,
             settled = obj.optBoolean("settled", false),
           )
@@ -377,6 +464,7 @@ object BackupSerializer {
             personName = personName,
             amount = amount,
             paymentMethod = PaymentMethod.fromWire(obj.optString("paymentMethod")).wireValue,
+            accountId = obj.optString("accountId", "").ifBlank { null },
             note = obj.optString("note", ""),
             dateMillis = dateMillis,
             monthKey = monthKey,
@@ -397,6 +485,7 @@ object BackupSerializer {
             name = name,
             iconKey = obj.optString("iconKey", "other"),
             colorHex = obj.optLong("colorHex", 0xFF0E7C5B),
+            categoryType = CategoryFlowType.fromWire(obj.optString("categoryType", "EXPENSE")).wireValue,
           )
         )
       }
@@ -438,6 +527,7 @@ object BackupSerializer {
       payablePayments = payablePayments,
       receivables = receivables,
       receivablePayments = receivablePayments,
+      customAccounts = customAccounts,
     )
   }
 
@@ -461,11 +551,14 @@ object BackupSerializer {
     payablePayments: List<PayablePayment> = emptyList(),
     receivables: List<Receivable> = emptyList(),
     receivablePayments: List<ReceivablePayment> = emptyList(),
+    accountsById: Map<String, CustomAccount> = emptyMap(),
   ): String {
     val sb = StringBuilder()
-    // UTF-8 BOM so Bengali & Hindi text opens cleanly in Microsoft Excel
     sb.append('\uFEFF')
     sb.append("Type,${strings.dateLabel},${strings.expenseTitleLabel},${strings.categoryLabel},${strings.paymentMethodLabel},${strings.amountLabel},Currency,${strings.noteOptionalLabel}\n")
+
+    fun accountDisplay(accountId: String?, methodWire: String): String =
+      accountId?.let { accountsById[it]?.name } ?: methodLabel(methodWire, strings)
 
     data class CsvRow(
       val dateMillis: Long,
@@ -480,27 +573,28 @@ object BackupSerializer {
     val rows = buildList {
       for (exp in expenses) {
         val catName = categoriesById[exp.categoryId]?.name ?: exp.categoryId
-        add(CsvRow(exp.dateMillis, strings.entryTypeExpense, exp.title, catName, methodLabel(exp.paymentMethod, strings), "-${exp.amount}", exp.note))
+        add(CsvRow(exp.dateMillis, strings.entryTypeExpense, exp.title, catName, accountDisplay(exp.accountId, exp.paymentMethod), "-${exp.amount}", exp.note))
       }
       for (inc in incomes) {
-        add(CsvRow(inc.dateMillis, strings.entryTypeIncome, inc.title, strings.entryTypeIncome, methodLabel(inc.paymentMethod, strings), "+${inc.amount}", inc.note))
+        val catName = inc.categoryId?.let { categoriesById[it]?.name } ?: strings.entryTypeIncome
+        add(CsvRow(inc.dateMillis, strings.entryTypeIncome, inc.title, catName, accountDisplay(inc.accountId, inc.paymentMethod), "+${inc.amount}", inc.note))
       }
       for (tr in transfers) {
-        val fromLbl = methodLabel(tr.fromMethod, strings)
-        val toLbl = methodLabel(tr.toMethod, strings)
-        add(CsvRow(tr.dateMillis, strings.entryTypeTransfer, "$fromLbl → $toLbl", strings.entryTypeTransfer, "$fromLbl → $toLbl", "${tr.amount}", tr.note))
+        val fromLbl = accountDisplay(tr.fromAccountId, tr.fromMethod)
+        val toLbl = accountDisplay(tr.toAccountId, tr.toMethod)
+        add(CsvRow(tr.dateMillis, strings.entryTypeTransfer, "$fromLbl -> $toLbl", strings.entryTypeTransfer, "$fromLbl -> $toLbl", "${tr.amount}", tr.note))
       }
       for (pay in payables) {
-        add(CsvRow(pay.dateMillis, strings.entryTypeBorrow, pay.personName, strings.entryTypeBorrow, methodLabel(pay.paymentMethod, strings), "+${pay.amount}", pay.note))
+        add(CsvRow(pay.dateMillis, strings.entryTypeBorrow, pay.personName, strings.entryTypeBorrow, accountDisplay(pay.accountId, pay.paymentMethod), "+${pay.amount}", pay.note))
       }
       for (pmt in payablePayments) {
-        add(CsvRow(pmt.dateMillis, strings.entryTypeRepayment, pmt.personName, strings.entryTypeRepayment, methodLabel(pmt.paymentMethod, strings), "-${pmt.amount}", pmt.note))
+        add(CsvRow(pmt.dateMillis, strings.entryTypeRepayment, pmt.personName, strings.entryTypeRepayment, accountDisplay(pmt.accountId, pmt.paymentMethod), "-${pmt.amount}", pmt.note))
       }
       for (rec in receivables) {
-        add(CsvRow(rec.dateMillis, strings.entryTypeLend, rec.personName, strings.entryTypeLend, methodLabel(rec.paymentMethod, strings), "-${rec.amount}", rec.note))
+        add(CsvRow(rec.dateMillis, strings.entryTypeLend, rec.personName, strings.entryTypeLend, accountDisplay(rec.accountId, rec.paymentMethod), "-${rec.amount}", rec.note))
       }
       for (pmt in receivablePayments) {
-        add(CsvRow(pmt.dateMillis, strings.entryTypeCollection, pmt.personName, strings.entryTypeCollection, methodLabel(pmt.paymentMethod, strings), "+${pmt.amount}", pmt.note))
+        add(CsvRow(pmt.dateMillis, strings.entryTypeCollection, pmt.personName, strings.entryTypeCollection, accountDisplay(pmt.accountId, pmt.paymentMethod), "+${pmt.amount}", pmt.note))
       }
     }.sortedByDescending { it.dateMillis }
 
@@ -515,6 +609,54 @@ object BackupSerializer {
       sb.append(csvEscape(currencySymbol)).append(',')
       sb.append(csvEscape(row.note)).append('\n')
     }
+    return sb.toString()
+  }
+
+  fun toLedgerCsv(
+    rows: List<LedgerCsvRow>,
+    currencySymbol: String,
+    langCode: String,
+    strings: AppStrings,
+  ): String {
+    val sb = StringBuilder()
+    sb.append('\uFEFF')
+    sb.append("${strings.dateLabel},Particulars,${strings.accountsLabel},${strings.categoryLabel},${strings.receiptsLabel},${strings.paymentsLabel},${strings.runningBalanceLabel},Currency\n")
+    for (row in rows) {
+      val dateStr = DateFormatUtils.formatDateCompact(row.dateMillis, langCode)
+      sb.append(csvEscape(dateStr)).append(',')
+      sb.append(csvEscape(row.particulars)).append(',')
+      sb.append(csvEscape(row.accountName)).append(',')
+      sb.append(csvEscape(row.categoryOrType)).append(',')
+      sb.append(if (row.receiptAmount > 0.0) row.receiptAmount else "").append(',')
+      sb.append(if (row.paymentAmount > 0.0) row.paymentAmount else "").append(',')
+      sb.append(row.runningBalance).append(',')
+      sb.append(csvEscape(currencySymbol)).append('\n')
+    }
+    return sb.toString()
+  }
+
+  fun toTrialBalanceCsv(
+    rows: List<TrialBalanceCsvRow>,
+    totalDebit: Double,
+    totalCredit: Double,
+    currencySymbol: String,
+    strings: AppStrings,
+  ): String {
+    val sb = StringBuilder()
+    sb.append('\uFEFF')
+    sb.append("Group,Account Head,${strings.debitLabel},${strings.creditLabel},Currency\n")
+    for (row in rows) {
+      sb.append(csvEscape(row.groupName)).append(',')
+      sb.append(csvEscape(row.accountHead)).append(',')
+      sb.append(if (row.debitAmount > 0.0) row.debitAmount else "").append(',')
+      sb.append(if (row.creditAmount > 0.0) row.creditAmount else "").append(',')
+      sb.append(csvEscape(currencySymbol)).append('\n')
+    }
+    sb.append(csvEscape("Total")).append(',')
+    sb.append(csvEscape("Total")).append(',')
+    sb.append(totalDebit).append(',')
+    sb.append(totalCredit).append(',')
+    sb.append(csvEscape(currencySymbol)).append('\n')
     return sb.toString()
   }
 

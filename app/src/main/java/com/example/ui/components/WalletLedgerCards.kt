@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,8 +50,11 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.data.model.AccountSummary
 import com.example.data.model.AccountTransfer
+import com.example.data.model.CategoryCatalog
 import com.example.data.model.CurrencyFormat
+import com.example.data.model.DateFormatUtils
 import com.example.data.model.Payable
 import com.example.data.model.PayablePayment
 import com.example.data.model.PaymentMethod
@@ -74,6 +78,8 @@ fun AccountWalletsStrip(
   onOpenTransfer: () -> Unit,
   onOpenBorrow: () -> Unit,
   onOpenLend: () -> Unit = {},
+  accountSummaries: List<AccountSummary> = emptyList(),
+  blurBalances: Boolean = false,
 ) {
   val strings = LocalStrings.current
 
@@ -84,42 +90,61 @@ fun AccountWalletsStrip(
         .horizontalScroll(rememberScrollState()),
       horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-      AccountMiniPill(
-        label = strings.cash,
-        amount = balances.cash,
-        currencySymbol = currencySymbol,
-        icon = Icons.Rounded.Payments,
-        tint = SemanticSafeLight,
-        onClick = onClickAccounts,
-        modifier = Modifier.testTag("acct_pill_cash"),
-      )
-      AccountMiniPill(
-        label = strings.bank,
-        amount = balances.bank,
-        currencySymbol = currencySymbol,
-        icon = Icons.Rounded.AccountBalance,
-        tint = MaterialTheme.colorScheme.primary,
-        onClick = onClickAccounts,
-        modifier = Modifier.testTag("acct_pill_bank"),
-      )
-      AccountMiniPill(
-        label = strings.mobileBanking,
-        amount = balances.mobile,
-        currencySymbol = currencySymbol,
-        icon = Icons.Rounded.PhoneAndroid,
-        tint = MaterialTheme.colorScheme.tertiary,
-        onClick = onClickAccounts,
-        modifier = Modifier.testTag("acct_pill_mobile"),
-      )
-      AccountMiniPill(
-        label = strings.card,
-        amount = balances.card,
-        currencySymbol = currencySymbol,
-        icon = Icons.Rounded.CreditCard,
-        tint = MaterialTheme.colorScheme.secondary,
-        onClick = onClickAccounts,
-        modifier = Modifier.testTag("acct_pill_card"),
-      )
+      if (accountSummaries.isNotEmpty()) {
+        accountSummaries.forEach { summary ->
+          AccountMiniPill(
+            label = summary.name,
+            amount = summary.currentBalance,
+            currencySymbol = currencySymbol,
+            icon = CategoryCatalog.iconFor(summary.iconKey),
+            tint = Color(summary.colorHex),
+            blurBalances = blurBalances,
+            onClick = onClickAccounts,
+            modifier = Modifier.testTag("acct_pill_${summary.accountId}"),
+          )
+        }
+      } else {
+        AccountMiniPill(
+          label = strings.cash,
+          amount = balances.cash,
+          currencySymbol = currencySymbol,
+          icon = Icons.Rounded.Payments,
+          tint = SemanticSafeLight,
+          blurBalances = blurBalances,
+          onClick = onClickAccounts,
+          modifier = Modifier.testTag("acct_pill_cash"),
+        )
+        AccountMiniPill(
+          label = strings.bank,
+          amount = balances.bank,
+          currencySymbol = currencySymbol,
+          icon = Icons.Rounded.AccountBalance,
+          tint = MaterialTheme.colorScheme.primary,
+          blurBalances = blurBalances,
+          onClick = onClickAccounts,
+          modifier = Modifier.testTag("acct_pill_bank"),
+        )
+        AccountMiniPill(
+          label = strings.mobileBanking,
+          amount = balances.mobile,
+          currencySymbol = currencySymbol,
+          icon = Icons.Rounded.PhoneAndroid,
+          tint = MaterialTheme.colorScheme.tertiary,
+          blurBalances = blurBalances,
+          onClick = onClickAccounts,
+          modifier = Modifier.testTag("acct_pill_mobile"),
+        )
+        AccountMiniPill(
+          label = strings.card,
+          amount = balances.card,
+          currencySymbol = currencySymbol,
+          icon = Icons.Rounded.CreditCard,
+          tint = MaterialTheme.colorScheme.secondary,
+          blurBalances = blurBalances,
+          onClick = onClickAccounts,
+          modifier = Modifier.testTag("acct_pill_card"),
+        )
+      }
     }
 
     Row(
@@ -264,6 +289,7 @@ private fun AccountMiniPill(
   currencySymbol: String,
   icon: ImageVector,
   tint: Color,
+  blurBalances: Boolean,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -296,14 +322,9 @@ private fun AccountMiniPill(
           color = MaterialTheme.colorScheme.onSurfaceVariant,
           maxLines = 1,
         )
-        val amountStr = if (amount < 0.0) {
-          "-${CurrencyFormat.format(-amount, currencySymbol)}"
-        } else {
-          CurrencyFormat.format(amount, currencySymbol)
-        }
-        Text(
-          text = amountStr,
-          fontFamily = HisabMonoFontFamily,
+        SensitiveAmountText(
+          text = CurrencyFormat.formatSigned(amount, currencySymbol),
+          blurBalances = blurBalances,
           style = MaterialTheme.typography.labelLarge,
           fontWeight = FontWeight.Bold,
           color = if (amount < 0.0) SemanticDangerLight else MaterialTheme.colorScheme.onSurface,
@@ -319,20 +340,28 @@ fun TransferRowCard(
   currencySymbol: String,
   onClick: () -> Unit,
   onDelete: () -> Unit,
+  fromAccountLabel: String? = null,
+  toAccountLabel: String? = null,
+  showNotes: Boolean = true,
+  blurBalances: Boolean = false,
+  selectionMode: Boolean = false,
+  selected: Boolean = false,
+  onToggleSelect: (() -> Unit)? = null,
 ) {
   val strings = LocalStrings.current
-  val fromLbl = methodLabel(transfer.fromMethod, strings)
-  val toLbl = methodLabel(transfer.toMethod, strings)
+  val fromLbl = fromAccountLabel ?: methodLabel(transfer.fromMethod, strings)
+  val toLbl = toAccountLabel ?: methodLabel(transfer.toMethod, strings)
 
   Card(
     colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+      containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+      else MaterialTheme.colorScheme.surfaceContainerLowest,
     ),
     shape = RoundedCornerShape(16.dp),
     modifier = Modifier
       .fillMaxWidth()
       .clip(RoundedCornerShape(16.dp))
-      .clickable(onClick = onClick)
+      .clickable { if (selectionMode && onToggleSelect != null) onToggleSelect() else onClick() }
       .testTag("transfer_item_${transfer.id}"),
   ) {
     Row(
@@ -341,6 +370,13 @@ fun TransferRowCard(
         .padding(horizontal = 14.dp, vertical = 12.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
+      if (selectionMode) {
+        Checkbox(
+          checked = selected,
+          onCheckedChange = { onToggleSelect?.invoke() },
+          modifier = Modifier.testTag("select_transfer_${transfer.id}"),
+        )
+      }
       Box(
         modifier = Modifier
           .size(44.dp)
@@ -366,7 +402,7 @@ fun TransferRowCard(
         Text(
           text = buildString {
             append(strings.entryTypeTransfer)
-            if (transfer.note.isNotBlank()) {
+            if (showNotes && transfer.note.isNotBlank()) {
               append(" • ")
               append(transfer.note)
             }
@@ -378,19 +414,21 @@ fun TransferRowCard(
         )
       }
       Spacer(Modifier.width(8.dp))
-      Text(
+      SensitiveAmountText(
         text = CurrencyFormat.format(transfer.amount, currencySymbol),
-        fontFamily = HisabMonoFontFamily,
+        blurBalances = blurBalances,
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary,
       )
-      IconButton(onClick = onDelete, modifier = Modifier.testTag("delete_transfer_${transfer.id}")) {
-        Icon(
-          imageVector = Icons.Rounded.DeleteOutline,
-          contentDescription = strings.delete,
-          tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+      if (!selectionMode) {
+        IconButton(onClick = onDelete, modifier = Modifier.testTag("delete_transfer_${transfer.id}")) {
+          Icon(
+            imageVector = Icons.Rounded.DeleteOutline,
+            contentDescription = strings.delete,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
       }
     }
   }
@@ -404,21 +442,31 @@ fun PayableRowCard(
   onClick: () -> Unit,
   onRepay: () -> Unit,
   onDelete: () -> Unit,
+  accountLabel: String? = null,
+  showNotes: Boolean = true,
+  blurBalances: Boolean = false,
+  langCode: String = "bn",
+  nowMillis: Long = System.currentTimeMillis(),
+  selectionMode: Boolean = false,
+  selected: Boolean = false,
+  onToggleSelect: (() -> Unit)? = null,
 ) {
   val strings = LocalStrings.current
-  val method = methodLabel(payable.paymentMethod, strings)
+  val method = accountLabel ?: methodLabel(payable.paymentMethod, strings)
   val remaining = (payable.amount - paidAmount).coerceAtLeast(0.0)
   val isSettled = remaining <= 0.001
+  val isOverdue = !isSettled && payable.dueDateMillis != null && payable.dueDateMillis > 0L && payable.dueDateMillis < nowMillis
 
   Card(
     colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+      containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+      else MaterialTheme.colorScheme.surfaceContainerLowest,
     ),
     shape = RoundedCornerShape(16.dp),
     modifier = Modifier
       .fillMaxWidth()
       .clip(RoundedCornerShape(16.dp))
-      .clickable(onClick = onClick)
+      .clickable { if (selectionMode && onToggleSelect != null) onToggleSelect() else onClick() }
       .testTag("payable_item_${payable.id}"),
   ) {
     Row(
@@ -427,51 +475,96 @@ fun PayableRowCard(
         .padding(horizontal = 14.dp, vertical = 12.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
+      if (selectionMode) {
+        Checkbox(
+          checked = selected,
+          onCheckedChange = { onToggleSelect?.invoke() },
+          modifier = Modifier.testTag("select_payable_${payable.id}"),
+        )
+      }
       Box(
         modifier = Modifier
           .size(44.dp)
           .clip(CircleShape)
-          .background(SemanticWarningLight.copy(alpha = 0.16f)),
+          .background((if (isOverdue) SemanticDangerLight else SemanticWarningLight).copy(alpha = 0.16f)),
         contentAlignment = Alignment.Center,
       ) {
         Icon(
           imageVector = Icons.Rounded.Handshake,
           contentDescription = strings.entryTypeBorrow,
-          tint = SemanticWarningLight,
+          tint = if (isOverdue) SemanticDangerLight else SemanticWarningLight,
           modifier = Modifier.size(22.dp),
         )
       }
       Spacer(Modifier.width(12.dp))
-      Column(modifier = Modifier.weight(1f)) {
-        Text(
-          text = payable.personName,
-          style = MaterialTheme.typography.titleMedium,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
+      Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+          Text(
+            text = payable.personName,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+          )
+          if (isOverdue) {
+            Surface(
+              color = SemanticDangerLight.copy(alpha = 0.16f),
+              shape = RoundedCornerShape(50),
+            ) {
+              Text(
+                text = strings.overdueBadge,
+                style = MaterialTheme.typography.labelSmall,
+                color = SemanticDangerLight,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+              )
+            }
+          }
+        }
         val statusText = if (isSettled) {
           strings.settledBadge
         } else {
-          "${strings.dueAmountLabel}: ${CurrencyFormat.format(remaining, currencySymbol)}"
+          "${strings.dueAmountLabel}: ${if (blurBalances) "••••" else CurrencyFormat.format(remaining, currencySymbol)}"
         }
         Text(
-          text = "$method • $statusText",
-          style = MaterialTheme.typography.bodyMedium,
-          color = if (isSettled) SemanticSafeLight else SemanticWarningLight,
+          text = buildString {
+            append("$method • $statusText")
+            payable.dueDateMillis?.takeIf { it > 0L }?.let { due ->
+              append(" • ${strings.dueDateLabel}: ${DateFormatUtils.formatDateCompact(due, langCode)}")
+            }
+          },
+          style = MaterialTheme.typography.bodySmall,
+          color = when {
+            isSettled -> SemanticSafeLight
+            isOverdue -> SemanticDangerLight
+            else -> SemanticWarningLight
+          },
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
         )
+        if (showNotes && payable.note.isNotBlank()) {
+          Text(
+            text = payable.note,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+        }
       }
       Spacer(Modifier.width(6.dp))
       Column(horizontalAlignment = Alignment.End) {
-        Text(
+        SensitiveAmountText(
           text = "+${CurrencyFormat.format(payable.amount, currencySymbol)}",
-          fontFamily = HisabMonoFontFamily,
+          blurBalances = blurBalances,
           style = MaterialTheme.typography.titleMedium,
           fontWeight = FontWeight.Bold,
           color = SemanticSafeLight,
         )
-        if (!isSettled) {
+        if (!isSettled && !selectionMode) {
           FilledTonalButton(
             onClick = onRepay,
             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
@@ -481,12 +574,14 @@ fun PayableRowCard(
           }
         }
       }
-      IconButton(onClick = onDelete, modifier = Modifier.testTag("delete_payable_${payable.id}")) {
-        Icon(
-          imageVector = Icons.Rounded.DeleteOutline,
-          contentDescription = strings.delete,
-          tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+      if (!selectionMode) {
+        IconButton(onClick = onDelete, modifier = Modifier.testTag("delete_payable_${payable.id}")) {
+          Icon(
+            imageVector = Icons.Rounded.DeleteOutline,
+            contentDescription = strings.delete,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
       }
     }
   }
@@ -497,9 +592,12 @@ fun RepaymentRowCard(
   payment: PayablePayment,
   currencySymbol: String,
   onDelete: () -> Unit,
+  accountLabel: String? = null,
+  showNotes: Boolean = true,
+  blurBalances: Boolean = false,
 ) {
   val strings = LocalStrings.current
-  val method = methodLabel(payment.paymentMethod, strings)
+  val method = accountLabel ?: methodLabel(payment.paymentMethod, strings)
 
   Card(
     colors = CardDefaults.cardColors(
@@ -543,7 +641,7 @@ fun RepaymentRowCard(
             append(strings.entryTypeRepayment)
             append(" • ")
             append(method)
-            if (payment.note.isNotBlank()) {
+            if (showNotes && payment.note.isNotBlank()) {
               append(" • ")
               append(payment.note)
             }
@@ -555,9 +653,9 @@ fun RepaymentRowCard(
         )
       }
       Spacer(Modifier.width(8.dp))
-      Text(
+      SensitiveAmountText(
         text = "-${CurrencyFormat.format(payment.amount, currencySymbol)}",
-        fontFamily = HisabMonoFontFamily,
+        blurBalances = blurBalances,
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onSurface,
@@ -581,21 +679,31 @@ fun ReceivableRowCard(
   onClick: () -> Unit,
   onCollect: () -> Unit,
   onDelete: () -> Unit,
+  accountLabel: String? = null,
+  showNotes: Boolean = true,
+  blurBalances: Boolean = false,
+  langCode: String = "bn",
+  nowMillis: Long = System.currentTimeMillis(),
+  selectionMode: Boolean = false,
+  selected: Boolean = false,
+  onToggleSelect: (() -> Unit)? = null,
 ) {
   val strings = LocalStrings.current
-  val method = methodLabel(receivable.paymentMethod, strings)
+  val method = accountLabel ?: methodLabel(receivable.paymentMethod, strings)
   val remaining = (receivable.amount - collectedAmount).coerceAtLeast(0.0)
   val isSettled = remaining <= 0.001
+  val isOverdue = !isSettled && receivable.dueDateMillis != null && receivable.dueDateMillis > 0L && receivable.dueDateMillis < nowMillis
 
   Card(
     colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+      containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+      else MaterialTheme.colorScheme.surfaceContainerLowest,
     ),
     shape = RoundedCornerShape(16.dp),
     modifier = Modifier
       .fillMaxWidth()
       .clip(RoundedCornerShape(16.dp))
-      .clickable(onClick = onClick)
+      .clickable { if (selectionMode && onToggleSelect != null) onToggleSelect() else onClick() }
       .testTag("receivable_item_${receivable.id}"),
   ) {
     Row(
@@ -604,51 +712,96 @@ fun ReceivableRowCard(
         .padding(horizontal = 14.dp, vertical = 12.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
+      if (selectionMode) {
+        Checkbox(
+          checked = selected,
+          onCheckedChange = { onToggleSelect?.invoke() },
+          modifier = Modifier.testTag("select_receivable_${receivable.id}"),
+        )
+      }
       Box(
         modifier = Modifier
           .size(44.dp)
           .clip(CircleShape)
-          .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)),
+          .background((if (isOverdue) SemanticDangerLight else MaterialTheme.colorScheme.primary).copy(alpha = 0.14f)),
         contentAlignment = Alignment.Center,
       ) {
         Icon(
           imageVector = Icons.Rounded.NorthEast,
           contentDescription = strings.entryTypeLend,
-          tint = MaterialTheme.colorScheme.primary,
+          tint = if (isOverdue) SemanticDangerLight else MaterialTheme.colorScheme.primary,
           modifier = Modifier.size(22.dp),
         )
       }
       Spacer(Modifier.width(12.dp))
-      Column(modifier = Modifier.weight(1f)) {
-        Text(
-          text = receivable.personName,
-          style = MaterialTheme.typography.titleMedium,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
+      Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+          Text(
+            text = receivable.personName,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
+          )
+          if (isOverdue) {
+            Surface(
+              color = SemanticDangerLight.copy(alpha = 0.16f),
+              shape = RoundedCornerShape(50),
+            ) {
+              Text(
+                text = strings.overdueBadge,
+                style = MaterialTheme.typography.labelSmall,
+                color = SemanticDangerLight,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+              )
+            }
+          }
+        }
         val statusText = if (isSettled) {
           strings.settledBadge
         } else {
-          "${strings.dueAmountLabel}: ${CurrencyFormat.format(remaining, currencySymbol)}"
+          "${strings.dueAmountLabel}: ${if (blurBalances) "••••" else CurrencyFormat.format(remaining, currencySymbol)}"
         }
         Text(
-          text = "$method • $statusText",
-          style = MaterialTheme.typography.bodyMedium,
-          color = if (isSettled) SemanticSafeLight else MaterialTheme.colorScheme.primary,
+          text = buildString {
+            append("$method • $statusText")
+            receivable.dueDateMillis?.takeIf { it > 0L }?.let { due ->
+              append(" • ${strings.dueDateLabel}: ${DateFormatUtils.formatDateCompact(due, langCode)}")
+            }
+          },
+          style = MaterialTheme.typography.bodySmall,
+          color = when {
+            isSettled -> SemanticSafeLight
+            isOverdue -> SemanticDangerLight
+            else -> MaterialTheme.colorScheme.primary
+          },
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
         )
+        if (showNotes && receivable.note.isNotBlank()) {
+          Text(
+            text = receivable.note,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+        }
       }
       Spacer(Modifier.width(6.dp))
       Column(horizontalAlignment = Alignment.End) {
-        Text(
+        SensitiveAmountText(
           text = "-${CurrencyFormat.format(receivable.amount, currencySymbol)}",
-          fontFamily = HisabMonoFontFamily,
+          blurBalances = blurBalances,
           style = MaterialTheme.typography.titleMedium,
           fontWeight = FontWeight.Bold,
           color = MaterialTheme.colorScheme.onSurface,
         )
-        if (!isSettled) {
+        if (!isSettled && !selectionMode) {
           FilledTonalButton(
             onClick = onCollect,
             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
@@ -660,12 +813,14 @@ fun ReceivableRowCard(
           }
         }
       }
-      IconButton(onClick = onDelete, modifier = Modifier.testTag("delete_receivable_${receivable.id}")) {
-        Icon(
-          imageVector = Icons.Rounded.DeleteOutline,
-          contentDescription = strings.delete,
-          tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+      if (!selectionMode) {
+        IconButton(onClick = onDelete, modifier = Modifier.testTag("delete_receivable_${receivable.id}")) {
+          Icon(
+            imageVector = Icons.Rounded.DeleteOutline,
+            contentDescription = strings.delete,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
       }
     }
   }
@@ -676,9 +831,12 @@ fun CollectionRowCard(
   payment: ReceivablePayment,
   currencySymbol: String,
   onDelete: () -> Unit,
+  accountLabel: String? = null,
+  showNotes: Boolean = true,
+  blurBalances: Boolean = false,
 ) {
   val strings = LocalStrings.current
-  val method = methodLabel(payment.paymentMethod, strings)
+  val method = accountLabel ?: methodLabel(payment.paymentMethod, strings)
 
   Card(
     colors = CardDefaults.cardColors(
@@ -722,7 +880,7 @@ fun CollectionRowCard(
             append(strings.entryTypeCollection)
             append(" • ")
             append(method)
-            if (payment.note.isNotBlank()) {
+            if (showNotes && payment.note.isNotBlank()) {
               append(" • ")
               append(payment.note)
             }
@@ -734,9 +892,9 @@ fun CollectionRowCard(
         )
       }
       Spacer(Modifier.width(8.dp))
-      Text(
+      SensitiveAmountText(
         text = "+${CurrencyFormat.format(payment.amount, currencySymbol)}",
-        fontFamily = HisabMonoFontFamily,
+        blurBalances = blurBalances,
         style = MaterialTheme.typography.titleMedium,
         fontWeight = FontWeight.Bold,
         color = SemanticSafeLight,
