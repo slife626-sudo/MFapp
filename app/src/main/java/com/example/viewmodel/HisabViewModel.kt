@@ -770,6 +770,12 @@ class HisabViewModel(
     }
   }
 
+  fun deletePayablePaymentById(paymentId: String) {
+    val payment = (dashboardState.value as? UiState.Success)?.data
+      ?.payablePayments?.firstOrNull { it.id == paymentId } ?: return
+    deletePayablePayment(payment)
+  }
+
   fun addReceivable(
     personName: String,
     amount: Double,
@@ -888,11 +894,22 @@ class HisabViewModel(
     }
   }
 
+  fun deleteReceivablePaymentById(paymentId: String) {
+    val payment = (dashboardState.value as? UiState.Success)?.data
+      ?.receivablePayments?.firstOrNull { it.id == paymentId } ?: return
+    deleteReceivablePayment(payment)
+  }
+
   fun bulkSoftDeleteTransactions(items: List<Pair<String, String>>) {
     val currentData = (dashboardState.value as? UiState.Success)?.data ?: return
     if (items.isEmpty()) return
     viewModelScope.launch {
       var moved = 0
+      val deletedPayablePmtIds = items.filter { it.first == "PAYABLE_PAYMENT" }.map { it.second }.toMutableSet()
+      val deletedReceivablePmtIds = items.filter { it.first == "RECEIVABLE_PAYMENT" }.map { it.second }.toMutableSet()
+      val remainingPayablePmts = currentData.payablePayments.toMutableList()
+      val remainingReceivablePmts = currentData.receivablePayments.toMutableList()
+
       for ((entityType, id) in items) {
         val res = when (entityType) {
           "EXPENSE" -> currentData.expenses.firstOrNull { it.id == id }?.let {
@@ -908,9 +925,37 @@ class HisabViewModel(
             val relIds = currentData.payablePayments.filter { it.payableId == id }.map { it.id }
             accountTrashRepository.movePayableToTrash(currentUserId, pay, relIds)
           }
+          "PAYABLE_PAYMENT" -> remainingPayablePmts.firstOrNull { it.id == id }?.let { pmt ->
+            remainingPayablePmts.removeAll { it.id == id }
+            val parent = currentData.payables.firstOrNull { it.id == pmt.payableId }
+            val newPaidSum = remainingPayablePmts
+              .filter { it.payableId == pmt.payableId && it.id !in deletedPayablePmtIds }
+              .sumOf { it.amount }
+            deletedPayablePmtIds.remove(id)
+            repository.deletePayablePayment(
+              userId = currentUserId,
+              payment = pmt,
+              parentPayable = parent,
+              newPaidSumAfterDelete = newPaidSum,
+            )
+          }
           "RECEIVABLE" -> currentData.receivables.firstOrNull { it.id == id }?.let { rec ->
             val relIds = currentData.receivablePayments.filter { it.receivableId == id }.map { it.id }
             accountTrashRepository.moveReceivableToTrash(currentUserId, rec, relIds)
+          }
+          "RECEIVABLE_PAYMENT" -> remainingReceivablePmts.firstOrNull { it.id == id }?.let { col ->
+            remainingReceivablePmts.removeAll { it.id == id }
+            val parent = currentData.receivables.firstOrNull { it.id == col.receivableId }
+            val newCollectedSum = remainingReceivablePmts
+              .filter { it.receivableId == col.receivableId && it.id !in deletedReceivablePmtIds }
+              .sumOf { it.amount }
+            deletedReceivablePmtIds.remove(id)
+            repository.deleteReceivablePayment(
+              userId = currentUserId,
+              payment = col,
+              parentReceivable = parent,
+              newCollectedSumAfterDelete = newCollectedSum,
+            )
           }
           else -> null
         }

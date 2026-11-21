@@ -16,9 +16,12 @@ import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextInput
 import androidx.core.content.res.ResourcesCompat
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.backup.BackupSerializer
@@ -664,5 +667,117 @@ class ExampleRobolectricTest {
       assertEquals(target, selectedRouteState.value)
       composeRule.onNode(hasTestTag("nav_$target") and isSelected()).assertExists()
     }
+  }
+
+  @Test
+  fun `transactions screen shows loan repayment and collection entries`() {
+    val bn = stringsFor(AppLanguage.BENGALI)
+    val now = System.currentTimeMillis()
+    val monthKey = DateFormatUtils.currentMonthKey()
+    val data = DashboardUiData(
+      expenses = emptyList(),
+      incomes = emptyList(),
+      customCategories = emptyList(),
+      budgets = emptyList(),
+      hasPendingWrites = false,
+      isFromCache = false,
+      payables = listOf(
+        Payable(id = "p1", personName = "করিম", amount = 2000.0, paidAmount = 500.0, dateMillis = now - 2000L, monthKey = monthKey)
+      ),
+      payablePayments = listOf(
+        PayablePayment(id = "pmt1", payableId = "p1", personName = "করিম", amount = 500.0, dateMillis = now - 1000L, monthKey = monthKey)
+      ),
+      receivables = listOf(
+        Receivable(id = "r1", personName = "রহিম", amount = 1000.0, collectedAmount = 400.0, dateMillis = now - 500L, monthKey = monthKey)
+      ),
+      receivablePayments = listOf(
+        ReceivablePayment(id = "col1", receivableId = "r1", personName = "রহিম", amount = 400.0, dateMillis = now, monthKey = monthKey)
+      ),
+    )
+
+    composeRule.setContent {
+      CompositionLocalProvider(LocalStrings provides bn) {
+        HisabTheme {
+          TransactionsScreen(
+            uiState = UiState.Success(data),
+            settings = UserSettings(language = AppLanguage.BENGALI),
+            selectedPeriod = PeriodFilter.THIS_MONTH,
+            selectedMonthKey = monthKey,
+            onSelectPeriod = {},
+            onShiftMonth = {},
+            onEditExpense = {},
+            onEditIncome = {},
+            onEditTransfer = {},
+            onEditPayable = {},
+            onEditReceivable = {},
+            onDeleteSingle = { _, _ -> },
+            onBulkSoftDelete = {},
+          )
+        }
+      }
+    }
+
+    composeRule.waitForIdle()
+    // Under ALL (newest first), collection col1 is visible right away
+    composeRule.onNode(hasTestTag("tx_row_RECEIVABLE_PAYMENT:col1")).assertExists()
+
+    // Filter to Borrow / Payable tab: both Payable (borrow) and PayablePayment (repayment) must appear
+    composeRule.onNode(hasTestTag("tx_filter_PAYABLE")).performClick()
+    composeRule.waitForIdle()
+    composeRule.onNode(hasTestTag("tx_row_PAYABLE:p1")).assertExists()
+    composeRule.onNode(hasTestTag("tx_row_PAYABLE_PAYMENT:pmt1")).assertExists()
+
+    // Filter to Lend / Receivable tab: both Receivable (lend) and ReceivablePayment (collection) must appear
+    composeRule.onNode(hasTestTag("tx_filter_RECEIVABLE")).performClick()
+    composeRule.waitForIdle()
+    composeRule.onNode(hasTestTag("tx_row_RECEIVABLE:r1")).assertExists()
+    composeRule.onNode(hasTestTag("tx_row_RECEIVABLE_PAYMENT:col1")).assertExists()
+  }
+
+  @Test
+  fun `ledger screen provides search box that filters entries`() {
+    val bn = stringsFor(AppLanguage.BENGALI)
+    val now = System.currentTimeMillis()
+    val monthKey = DateFormatUtils.currentMonthKey()
+    val data = DashboardUiData(
+      expenses = listOf(
+        Expense(id = "e1", title = "চাল ডাল", amount = 450.0, categoryId = "groceries", dateMillis = now - 1000L, monthKey = monthKey)
+      ),
+      incomes = emptyList(),
+      customCategories = emptyList(),
+      budgets = emptyList(),
+      hasPendingWrites = false,
+      isFromCache = false,
+      payablePayments = listOf(
+        PayablePayment(id = "pmt1", payableId = "p1", personName = "জয়নাল আবেদিন", amount = 2000.0, dateMillis = now, monthKey = monthKey)
+      ),
+    )
+
+    composeRule.setContent {
+      CompositionLocalProvider(LocalStrings provides bn) {
+        HisabTheme {
+          LedgerScreen(
+            uiState = UiState.Success(data),
+            settings = UserSettings(language = AppLanguage.BENGALI),
+            selectedPeriod = PeriodFilter.THIS_MONTH,
+            selectedMonthKey = monthKey,
+            onSelectPeriod = {},
+            onShiftMonth = {},
+            onExportLedgerCsv = {},
+          )
+        }
+      }
+    }
+
+    composeRule.waitForIdle()
+    composeRule.onNode(hasTestTag("ledger_search_input")).assertExists()
+    composeRule.onNode(hasTestTag("ledger_lazy_list")).performScrollToNode(hasText("জয়নাল আবেদিন", substring = true))
+    composeRule.onNode(hasText("জয়নাল আবেদিন", substring = true)).assertExists()
+    composeRule.onNode(hasTestTag("ledger_lazy_list")).performScrollToNode(hasTestTag("ledger_search_input"))
+    composeRule.onNode(hasTestTag("ledger_search_input")).performTextInput("জয়নাল")
+    composeRule.waitForIdle()
+    composeRule.onNode(hasTestTag("ledger_lazy_list")).performScrollToNode(hasText("জয়নাল আবেদিন", substring = true))
+    composeRule.onNode(hasText("জয়নাল আবেদিন", substring = true)).assertExists()
+    composeRule.onNode(hasText("চাল ডাল", substring = true)).assertDoesNotExist()
   }
 }

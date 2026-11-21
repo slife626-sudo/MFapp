@@ -28,8 +28,10 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Handshake
 import androidx.compose.material.icons.rounded.NorthEast
+import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SouthWest
 import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -72,8 +74,10 @@ import com.example.data.model.DateFormatUtils
 import com.example.data.model.Expense
 import com.example.data.model.Income
 import com.example.data.model.Payable
+import com.example.data.model.PayablePayment
 import com.example.data.model.PeriodFilter
 import com.example.data.model.Receivable
+import com.example.data.model.ReceivablePayment
 import com.example.data.model.UiState
 import com.example.data.prefs.UserSettings
 import com.example.i18n.LocalStrings
@@ -116,7 +120,9 @@ private data class UnifiedTxRow(
   val income: Income? = null,
   val transfer: AccountTransfer? = null,
   val payable: Payable? = null,
+  val payablePayment: PayablePayment? = null,
   val receivable: Receivable? = null,
+  val receivablePayment: ReceivablePayment? = null,
 ) {
   val selectionKey: String get() = "$entityType:$id"
 }
@@ -270,6 +276,25 @@ fun TransactionsScreen(
                 )
               )
             }
+            data.payablePayments.filter { it.dateMillis in startMillis..endMillis }.forEach { pmt ->
+              val acctLbl = data.accountLabel(pmt.accountId, pmt.paymentMethod, strings)
+              add(
+                UnifiedTxRow(
+                  entityType = "PAYABLE_PAYMENT",
+                  id = pmt.id,
+                  dateMillis = pmt.dateMillis,
+                  title = pmt.personName,
+                  subtitle = "${strings.entryTypeRepayment} • $acctLbl",
+                  note = pmt.note,
+                  amount = pmt.amount,
+                  signedPrefix = "-",
+                  amountColor = SemanticDangerLight,
+                  iconKey = "repayment",
+                  iconTint = SemanticDangerLight,
+                  payablePayment = pmt,
+                )
+              )
+            }
           }
           if (typeFilter == TxFilterMode.ALL || typeFilter == TxFilterMode.RECEIVABLE) {
             data.receivables.filter { it.dateMillis in startMillis..endMillis }.forEach { rec ->
@@ -288,6 +313,25 @@ fun TransactionsScreen(
                   iconKey = "trending",
                   iconTint = primaryColor,
                   receivable = rec,
+                )
+              )
+            }
+            data.receivablePayments.filter { it.dateMillis in startMillis..endMillis }.forEach { col ->
+              val acctLbl = data.accountLabel(col.accountId, col.paymentMethod, strings)
+              add(
+                UnifiedTxRow(
+                  entityType = "RECEIVABLE_PAYMENT",
+                  id = col.id,
+                  dateMillis = col.dateMillis,
+                  title = col.personName,
+                  subtitle = "${strings.entryTypeCollection} • $acctLbl",
+                  note = col.note,
+                  amount = col.amount,
+                  signedPrefix = "+",
+                  amountColor = SemanticSafeLight,
+                  iconKey = "collection",
+                  iconTint = SemanticSafeLight,
+                  receivablePayment = col,
                 )
               )
             }
@@ -378,8 +422,8 @@ fun TransactionsScreen(
               OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text(strings.searchExpenses) },
-                leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = strings.searchExpenses) },
+                placeholder = { Text(strings.searchTransactionsHint) },
+                leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = strings.searchTransactionsHint) },
                 trailingIcon = {
                   if (searchQuery.isNotEmpty()) {
                     IconButton(onClick = { searchQuery = "" }) {
@@ -510,7 +554,15 @@ fun TransactionsScreen(
                         row.income != null -> onEditIncome(row.income)
                         row.transfer != null -> onEditTransfer(row.transfer)
                         row.payable != null -> onEditPayable(row.payable)
+                        row.payablePayment != null -> {
+                          data.payables.firstOrNull { it.id == row.payablePayment.payableId }
+                            ?.let(onEditPayable)
+                        }
                         row.receivable != null -> onEditReceivable(row.receivable)
+                        row.receivablePayment != null -> {
+                          data.receivables.firstOrNull { it.id == row.receivablePayment.receivableId }
+                            ?.let(onEditReceivable)
+                        }
                       }
                     }
                   }
@@ -540,7 +592,9 @@ fun TransactionsScreen(
                     val vector = when (row.entityType) {
                       "TRANSFER" -> Icons.Rounded.SwapHoriz
                       "PAYABLE" -> Icons.Rounded.Handshake
+                      "PAYABLE_PAYMENT" -> Icons.Rounded.Payments
                       "RECEIVABLE" -> Icons.Rounded.NorthEast
+                      "RECEIVABLE_PAYMENT" -> Icons.Rounded.SouthWest
                       "INCOME" -> Icons.Rounded.AccountBalanceWallet
                       else -> CategoryCatalog.iconFor(row.iconKey)
                     }

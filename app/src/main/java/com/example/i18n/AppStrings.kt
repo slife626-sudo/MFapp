@@ -45,6 +45,8 @@ interface AppStrings {
   val yesterday: String
   val allCategories: String
   val searchExpenses: String
+  val searchTransactionsHint: String
+  val searchLedgerHint: String
   val addExpense: String
   val editExpense: String
   val expenseTitleLabel: String
@@ -413,6 +415,8 @@ object BengaliStrings : AppStrings {
   override val yesterday = "গতকাল"
   override val allCategories = "সব বিভাগ"
   override val searchExpenses = "খরচ খুঁজুন..."
+  override val searchTransactionsHint = "লেনদেন খুঁজুন..."
+  override val searchLedgerHint = "খতিয়ানের এন্ট্রি খুঁজুন..."
   override val addExpense = "নতুন খরচ যোগ করুন"
   override val editExpense = "খরচ সম্পাদনা করুন"
   override val expenseTitleLabel = "খরচের বিবরণ (যেমন: দুপুরের খাবার)"
@@ -781,6 +785,8 @@ object EnglishStrings : AppStrings {
   override val yesterday = "Yesterday"
   override val allCategories = "All"
   override val searchExpenses = "Search expenses..."
+  override val searchTransactionsHint = "Search transactions..."
+  override val searchLedgerHint = "Search ledger entries..."
   override val addExpense = "Add Expense"
   override val editExpense = "Edit Expense"
   override val expenseTitleLabel = "Description (e.g., Lunch, Groceries)"
@@ -1149,6 +1155,8 @@ object HindiStrings : AppStrings {
   override val yesterday = "कल"
   override val allCategories = "सभी"
   override val searchExpenses = "खर्च खोजें..."
+  override val searchTransactionsHint = "लेन-देन खोजें..."
+  override val searchLedgerHint = "लेजर एंट्री खोजें..."
   override val addExpense = "नया खर्च जोड़ें"
   override val editExpense = "खर्च संपादित करें"
   override val expenseTitleLabel = "विवरण (जैसे: दोपहर का खाना)"

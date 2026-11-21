@@ -897,7 +897,9 @@ private fun AuthenticatedHisabApp(
                         "INCOME" -> viewModel.deleteIncome(id)
                         "TRANSFER" -> viewModel.deleteTransfer(id)
                         "PAYABLE" -> viewModel.deletePayable(id)
+                        "PAYABLE_PAYMENT" -> viewModel.deletePayablePaymentById(id)
                         "RECEIVABLE" -> viewModel.deleteReceivable(id)
+                        "RECEIVABLE_PAYMENT" -> viewModel.deleteReceivablePaymentById(id)
                       }
                     },
                     onBulkSoftDelete = viewModel::bulkSoftDeleteTransactions,
@@ -944,7 +946,9 @@ private fun AuthenticatedHisabApp(
                         "INCOME" -> viewModel.deleteIncome(id)
                         "TRANSFER" -> viewModel.deleteTransfer(id)
                         "PAYABLE" -> viewModel.deletePayable(id)
+                        "PAYABLE_PAYMENT" -> viewModel.deletePayablePaymentById(id)
                         "RECEIVABLE" -> viewModel.deleteReceivable(id)
+                        "RECEIVABLE_PAYMENT" -> viewModel.deleteReceivablePaymentById(id)
                       }
                     },
                     onBulkSoftDelete = viewModel::bulkSoftDeleteTransactions,
@@ -991,7 +995,9 @@ private fun AuthenticatedHisabApp(
                         "INCOME" -> viewModel.deleteIncome(id)
                         "TRANSFER" -> viewModel.deleteTransfer(id)
                         "PAYABLE" -> viewModel.deletePayable(id)
+                        "PAYABLE_PAYMENT" -> viewModel.deletePayablePaymentById(id)
                         "RECEIVABLE" -> viewModel.deleteReceivable(id)
+                        "RECEIVABLE_PAYMENT" -> viewModel.deleteReceivablePaymentById(id)
                       }
                     },
                     onBulkSoftDelete = viewModel::bulkSoftDeleteTransactions,
