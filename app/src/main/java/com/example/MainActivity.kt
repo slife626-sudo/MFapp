@@ -30,10 +30,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
-import androidx.compose.material.icons.outlined.Category
-import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.LocalOffer
+import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.rounded.AccountBalance
 import androidx.compose.material.icons.rounded.AccountBalanceWallet
@@ -43,12 +43,15 @@ import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.DarkMode
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Handshake
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.LightMode
+import androidx.compose.material.icons.rounded.LocalOffer
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MenuBook
+import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.ShoppingBag
@@ -64,8 +67,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.NavigationRail
@@ -133,8 +134,10 @@ import com.example.ui.components.AddEditAccountSheet
 import com.example.ui.components.AddEditExpenseSheet
 import com.example.ui.components.CollectReceivableDialog
 import com.example.ui.components.EntrySheetMode
+import com.example.ui.components.HisabRibbonBottomBar
 import com.example.ui.components.PinLockOverlay
 import com.example.ui.components.RepayPayableDialog
+import com.example.ui.components.RibbonNavItem
 import com.example.ui.screens.BudgetsScreen
 import com.example.ui.screens.CategoriesScreen
 import com.example.ui.screens.DashboardScreen
@@ -417,12 +420,22 @@ private fun AuthenticatedHisabApp(
 
   val destinations = remember(strings) {
     listOf(
-      NavDestination(ROUTE_DASHBOARD, strings.navDashboard, Icons.Rounded.Home, Icons.Outlined.Home),
+      NavDestination(ROUTE_DASHBOARD, strings.navDashboard, Icons.Rounded.GridView, Icons.Outlined.GridView),
       NavDestination(ROUTE_TRANSACTIONS, strings.navTransactions, Icons.Rounded.SwapHoriz, Icons.Outlined.SwapHoriz),
-      NavDestination(ROUTE_BUDGETS, strings.navBudgets, Icons.Rounded.AccountBalanceWallet, Icons.Outlined.AccountBalanceWallet),
-      NavDestination(ROUTE_WALLETS, strings.navAccounts, Icons.Rounded.AccountBalance, Icons.Outlined.AccountBalance),
-      NavDestination(ROUTE_CATEGORIES, strings.navCategories, Icons.Rounded.Category, Icons.Outlined.Category),
+      NavDestination(ROUTE_BUDGETS, strings.navBudgets, Icons.Rounded.Payments, Icons.Outlined.Payments),
+      NavDestination(ROUTE_WALLETS, strings.navAccounts, Icons.Rounded.AccountBalanceWallet, Icons.Outlined.AccountBalanceWallet),
+      NavDestination(ROUTE_CATEGORIES, strings.navCategories, Icons.Rounded.LocalOffer, Icons.Outlined.LocalOffer),
     )
+  }
+  val ribbonItems = remember(destinations) {
+    destinations.map { d ->
+      RibbonNavItem(
+        route = d.route,
+        label = d.label,
+        selectedIcon = d.selectedIcon,
+        unselectedIcon = d.unselectedIcon,
+      )
+    }
   }
 
   val successData = (uiState as? UiState.Success)?.data
@@ -713,30 +726,11 @@ private fun AuthenticatedHisabApp(
           },
           bottomBar = {
             if (!useNavRail) {
-              NavigationBar {
-                destinations.forEach { dest ->
-                  val selected = currentRoute == dest.route
-                  NavigationBarItem(
-                    selected = selected,
-                    onClick = { navigateTo(dest.route) },
-                    icon = {
-                      Icon(
-                        imageVector = if (selected) dest.selectedIcon else dest.unselectedIcon,
-                        contentDescription = dest.label,
-                      )
-                    },
-                    label = {
-                      Text(
-                        text = dest.label,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis,
-                      )
-                    },
-                    modifier = Modifier.testTag("nav_${dest.route}"),
-                  )
-                }
-              }
+              HisabRibbonBottomBar(
+                items = ribbonItems,
+                currentRoute = currentRoute,
+                onNavigate = ::navigateTo,
+              )
             }
           },
           floatingActionButton = {

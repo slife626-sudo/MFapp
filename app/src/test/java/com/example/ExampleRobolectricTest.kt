@@ -2,8 +2,23 @@ package com.example
 
 import android.content.Context
 import android.graphics.Typeface
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountBalanceWallet as OutlinedWallet
+import androidx.compose.material.icons.outlined.GridView as OutlinedGridView
+import androidx.compose.material.icons.outlined.LocalOffer as OutlinedLocalOffer
+import androidx.compose.material.icons.outlined.Payments as OutlinedPayments
+import androidx.compose.material.icons.outlined.SwapHoriz as OutlinedSwapHoriz
+import androidx.compose.material.icons.rounded.AccountBalanceWallet
+import androidx.compose.material.icons.rounded.GridView
+import androidx.compose.material.icons.rounded.LocalOffer
+import androidx.compose.material.icons.rounded.Payments
+import androidx.compose.material.icons.rounded.SwapHoriz
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.performClick
 import androidx.core.content.res.ResourcesCompat
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.backup.BackupSerializer
@@ -553,5 +568,101 @@ class ExampleRobolectricTest {
       }
     }
     composeRule.waitForIdle()
+  }
+
+  @Test
+  fun `bengali payable strings use dena without English Payable`() {
+    val bn = stringsFor(AppLanguage.BENGALI)
+    val allPayableTexts = listOf(
+      bn.addBorrow,
+      bn.editBorrow,
+      bn.borrowAutoPayableHint,
+      bn.payableFilterChip,
+      bn.walletsScreenTitle,
+      bn.totalPayablesLabel,
+      bn.unpaidPayablesTitle,
+      bn.settledPayablesTitle,
+      bn.noPayablesEmpty,
+      bn.repayPayableTitle,
+      bn.confirmDeletePayableTitle,
+      bn.entryTypeBorrow,
+      bn.entryTypeRepayment,
+      bn.payablesTab,
+    )
+    allPayableTexts.forEach { text ->
+      assertTrue("Unexpected 'Payable' in '$text'", !text.contains("Payable", ignoreCase = true))
+    }
+    listOf(
+      bn.addBorrow,
+      bn.borrowAutoPayableHint,
+      bn.totalPayablesLabel,
+      bn.unpaidPayablesTitle,
+      bn.entryTypeBorrow,
+      bn.entryTypeRepayment,
+      bn.payablesTab,
+    ).forEach { text ->
+      assertTrue("Expected দেনা in '$text'", text.contains("দেনা"))
+    }
+  }
+
+  @Test
+  fun `ribbon bottom bar highlights whichever menu item is selected`() {
+    val bn = stringsFor(AppLanguage.BENGALI)
+    val items = listOf(
+      com.example.ui.components.RibbonNavItem(
+        route = ROUTE_DASHBOARD,
+        label = bn.navDashboard,
+        selectedIcon = Icons.Rounded.GridView,
+        unselectedIcon = Icons.Outlined.OutlinedGridView,
+      ),
+      com.example.ui.components.RibbonNavItem(
+        route = ROUTE_TRANSACTIONS,
+        label = bn.navTransactions,
+        selectedIcon = Icons.Rounded.SwapHoriz,
+        unselectedIcon = Icons.Outlined.OutlinedSwapHoriz,
+      ),
+      com.example.ui.components.RibbonNavItem(
+        route = ROUTE_BUDGETS,
+        label = bn.navBudgets,
+        selectedIcon = Icons.Rounded.Payments,
+        unselectedIcon = Icons.Outlined.OutlinedPayments,
+      ),
+      com.example.ui.components.RibbonNavItem(
+        route = ROUTE_WALLETS,
+        label = bn.navAccounts,
+        selectedIcon = Icons.Rounded.AccountBalanceWallet,
+        unselectedIcon = Icons.Outlined.OutlinedWallet,
+      ),
+      com.example.ui.components.RibbonNavItem(
+        route = ROUTE_CATEGORIES,
+        label = bn.navCategories,
+        selectedIcon = Icons.Rounded.LocalOffer,
+        unselectedIcon = Icons.Outlined.OutlinedLocalOffer,
+      ),
+    )
+
+    val selectedRouteState = mutableStateOf(ROUTE_DASHBOARD)
+    composeRule.setContent {
+      CompositionLocalProvider(LocalStrings provides bn) {
+        HisabTheme {
+          com.example.ui.components.HisabRibbonBottomBar(
+            items = items,
+            currentRoute = selectedRouteState.value,
+            onNavigate = { selectedRouteState.value = it },
+          )
+        }
+      }
+    }
+
+    composeRule.waitForIdle()
+    composeRule.onNode(hasTestTag("nav_$ROUTE_DASHBOARD") and isSelected()).assertExists()
+
+    // Switch through every tab and verify selection state updates
+    listOf(ROUTE_TRANSACTIONS, ROUTE_BUDGETS, ROUTE_WALLETS, ROUTE_CATEGORIES, ROUTE_DASHBOARD).forEach { target ->
+      composeRule.onNode(hasTestTag("nav_$target")).performClick()
+      composeRule.waitForIdle()
+      assertEquals(target, selectedRouteState.value)
+      composeRule.onNode(hasTestTag("nav_$target") and isSelected()).assertExists()
+    }
   }
 }
